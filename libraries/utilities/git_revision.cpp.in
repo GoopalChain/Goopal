@@ -1,0 +1,14 @@
+#include <stdint.h>
+#include <bts/utilities/git_revision.hpp>
+
+#define GOP_GIT_REVISION_SHA "@GOP_GIT_REVISION_SHA@"
+#define GOP_GIT_REVISION_UNIX_TIMESTAMP @GOP_GIT_REVISION_UNIX_TIMESTAMP@
+#define GOP_GIT_REVISION_DESCRIPTION "@GOP_GIT_REVISION_DESCRIPTION@"
+
+namespace bts { namespace utilities {
+
+const char* const git_revision_sha = GOP_GIT_REVISION_SHA;
+const uint32_t git_revision_unix_timestamp = GOP_GIT_REVISION_UNIX_TIMESTAMP;
+const char* const git_revision_description = GOP_GIT_REVISION_DESCRIPTION;
+
+} } // end namespace bts::utilities
