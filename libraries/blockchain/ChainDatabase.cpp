@@ -1987,11 +1987,21 @@ namespace goopal { namespace blockchain {
                   {
                       auto trx_eval_state = std::make_shared<TransactionEvaluationState>( pending_trx_state.get() );
                       trx_eval_state->_enforce_canonical_signatures = config.transaction_canonical_signatures_required;
+                      trx_eval_state->_skip_signature_check = true;
                       trx_eval_state->evaluate( new_transaction );
-
+                      const ImessageIdType iMessageLength = trx_eval_state->imessage_length;
+                      if (iMessageLength > config.transaction_imessage_max_soft_length)
+                      {
+                          continue;
+                      }
+                      ShareType imessage_fee = 0;
+                      if (iMessageLength > GOP_BLOCKCHAIN_MAX_FREE_MESSAGE_SIZE)
+                      {
+                          imessage_fee = config.transaction_imessage_min_fee_coe * (iMessageLength - GOP_BLOCKCHAIN_MAX_FREE_MESSAGE_SIZE);
+                      }
                       // Check transaction fee limit
                       const ShareType transaction_fee = trx_eval_state->get_fees( 0 ) + trx_eval_state->alt_fees_paid.amount;
-                      if( transaction_fee < config.transaction_min_fee )
+                      if (transaction_fee < config.transaction_min_fee + imessage_fee)
                       {
                           wlog( "Excluding transaction ${id} with fee ${fee} because it does not meet transaction fee limit ${limit}",
                                 ("id",new_transaction.id())("fee",transaction_fee)("limit",config.transaction_min_fee) );
@@ -2137,6 +2147,15 @@ namespace goopal { namespace blockchain {
         }
         return entrys;
     } FC_CAPTURE_AND_RETHROW( (first)(limit) ) }
+
+    oAccountEntry ChainDatabase::get_account_by_address(const string  address_str) const
+    {
+        vector<AccountEntry> records;
+        auto account_id = my->_account_address_to_id.unordered_find(Address(address_str));
+
+        const oAccountEntry& entry = lookup<AccountEntry>(account_id->second);
+        return entry;
+    }
 
     vector<AssetEntry> ChainDatabase::get_assets( const string& first, uint32_t limit )const
     { try {
@@ -2527,17 +2546,24 @@ namespace goopal { namespace blockchain {
 		   return results;
 	   } FC_CAPTURE_AND_RETHROW((block_num))
    }
-   vector<GopTrxidBalance> ChainDatabase::fetch_gop_full_entry(const uint32_t& block_num)
+   vector<GopTrxidBalance> ChainDatabase::fetch_gop_full_entry(const uint32_t& block_num, const uint32_t & last_scan_block_num)
    {
 	   try{
 		   vector < GopTrxidBalance > results;
+		   if (block_num > last_scan_block_num)
+		   {
+			   return results;
+		   }
 		   for (auto iter = my->_gop_full_entry.unordered_begin();
 			   iter != my->_gop_full_entry.unordered_end(); ++iter)
 		   {
 			   auto block_iter = iter->second.gop_block_sort.lower_bound(block_num + 1);
 			   for (; block_iter != iter->second.gop_block_sort.end(); block_iter++)
 			   {
-				   results.emplace_back(block_iter->second);
+				   if (block_iter->second.block_num <= last_scan_block_num)
+				   {
+					   results.emplace_back(block_iter->second);
+				   }
 			   }
 		   }
 		   return results;

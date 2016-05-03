@@ -17,6 +17,7 @@
 //#include <fc/io/json.hpp>//add for fc::json::to_pretty_string(builder)  ???
 
 #include <blockchain/ForkBlocks.hpp>
+#include "blockchain/ImessageOperations.hpp"
 
 namespace goopal { namespace wallet {
 
@@ -43,6 +44,8 @@ namespace detail {
        if ( _blockchain->get_head_block_num() < last_unlocked_scanned_number )
        {
            self->set_last_scanned_block_number( _blockchain->get_head_block_num() );
+		   self->set_last_scanned_block_number_for_gop(_blockchain->get_head_block_num());
+		   
        }
    }
 
@@ -243,6 +246,7 @@ namespace detail {
 
                ++count;
                prev_block_num = current_block_num;
+			   self->set_last_scanned_block_number_for_gop(prev_block_num);
                ++current_block_num;
 
                if( count > 1 )
@@ -360,6 +364,8 @@ namespace detail {
            if( current_version < 102 )
            {
                self->set_transaction_fee( Asset( GOP_WALLET_DEFAULT_TRANSACTION_FEE ) );
+               self->set_transaction_imessage_fee_coe(GOP_BLOCKCHAIN_MIN_MESSAGE_FEE_COE);
+               self->set_transaction_imessage_soft_max_length(GOP_BLOCKCHAIN_MAX_SOFT_MAX_MESSAGE_SIZE);
            }
 
            if( current_version < 106 )
@@ -379,15 +385,21 @@ namespace detail {
                }
            }
 
-           if( current_version < 109 )
+           if( current_version < 111 )
            {
+               self->set_transaction_imessage_fee_coe(GOP_BLOCKCHAIN_MIN_MESSAGE_FEE_COE);
+               self->set_transaction_imessage_soft_max_length(GOP_BLOCKCHAIN_MAX_SOFT_MAX_MESSAGE_SIZE);
                const function<void( void )> repair = [&]()
                {
-                   _wallet_db.repair_entrys( _wallet_password );
+                   self->repair_entrys(optional<string>());
+                   self->start_scan(0, -1);
                };
                _unlocked_upgrade_tasks.push_back( repair );
            }
-
+		   if (current_version < 112)
+		   {
+			   self->set_last_scanned_block_number_for_gop(0);
+		   }
            if( _unlocked_upgrade_tasks.empty() )
            {
                self->set_version( GOP_WALLET_VERSION );
@@ -480,8 +492,11 @@ namespace detail {
           self->set_automatic_backups( true );
           self->set_transaction_scanning( true );
           self->set_last_scanned_block_number( _blockchain->get_head_block_num() );
+		  self->set_last_scanned_block_number_for_gop(0);
           self->set_transaction_fee( Asset( GOP_WALLET_DEFAULT_TRANSACTION_FEE ) );
           self->set_transaction_expiration( GOP_WALLET_DEFAULT_TRANSACTION_EXPIRATION_SEC );
+          self->set_transaction_imessage_fee_coe(GOP_BLOCKCHAIN_MIN_MESSAGE_FEE_COE);
+          self->set_transaction_imessage_soft_max_length(GOP_BLOCKCHAIN_MAX_SOFT_MAX_MESSAGE_SIZE);
 
           _wallet_db.close();
           _wallet_db.open( wallet_file_path );
@@ -1160,8 +1175,11 @@ namespace detail {
 
       const PublicKeyType account_public_key = my->_wallet_db.generate_new_account( my->_wallet_password, account_name, private_data );
 
-      if( num_accounts_before == 0 )
-          set_last_scanned_block_number( my->_blockchain->get_head_block_num() );
+	  if (num_accounts_before == 0)
+	  {
+		  set_last_scanned_block_number(my->_blockchain->get_head_block_num());
+		  set_last_scanned_block_number_for_gop(0);
+	  }
 
        my->_dirty_accounts = true;
 
@@ -1456,8 +1474,10 @@ namespace detail {
 		  active_key.encrypt_private_key(my->_wallet_password, active_private_key);
 		  my->_wallet_db.store_key(active_key);
 		  oWalletAccountEntry account_entry = my->_wallet_db.lookup_account(blockchain_account_entry->name);
-		  account_entry->set_active_key(blockchain::now(), active_public_key);
 		  FC_ASSERT(account_entry.valid(), "Account name not found!");
+		  account_entry->set_active_key(blockchain::now(), active_public_key);
+		  account_entry->last_update = blockchain::now();
+		  my->_wallet_db.store_account(*account_entry);
           return new_public_key;
       }
 
@@ -2132,6 +2152,7 @@ namespace detail {
                }
            }
        }
+       start_scan(0, -1);
    } FC_CAPTURE_AND_RETHROW( (collecting_account_name) ) }
 
    uint32_t Wallet::regenerate_keys(const string& account_name, uint32_t num_keys_to_regenerate)
@@ -2445,26 +2466,58 @@ namespace detail {
        return optional<variant_object>();
    } FC_CAPTURE_AND_RETHROW() }
 
-   ShareType Wallet::query_delegate_salary(const string& delegate_name)
+   DelegatePaySalary Wallet::query_delegate_salary(const string& delegate_name)
    {
 	   FC_ASSERT(is_open());
 	   FC_ASSERT(is_unlocked());
-	   FC_ASSERT(my->is_receive_account(delegate_name));
+	   //FC_ASSERT(my->is_receive_account(delegate_name));
 	   auto asset_rec = my->_blockchain->get_asset_entry(AssetIdType(0));
 
-	   auto delegate_account_entry = my->_blockchain->get_account_entry(delegate_name);
+       auto pending_state = my->_blockchain->get_pending_state();
+       
+       auto delegate_account_entry = pending_state->get_account_entry(delegate_name);
 	   FC_ASSERT(delegate_account_entry.valid());
 	   FC_ASSERT(delegate_account_entry->is_delegate());
 
-	   auto required_fees = get_transaction_fee();
-	   return delegate_account_entry->delegate_info->pay_balance;// -  required_fees.amount 
-	
-
+	   //auto required_fees = get_transaction_fee();
+       DelegatePaySalary delepatbal;
+       delepatbal.total_balance = delegate_account_entry->delegate_info->total_paid;
+       delepatbal.pay_balance = delegate_account_entry->delegate_info->pay_balance;
+       return delepatbal;
    }
+
+   std::map<std::string, goopal::blockchain::DelegatePaySalary> Wallet::query_delegate_salarys()
+   {
+       FC_ASSERT(is_open());
+       FC_ASSERT(is_unlocked());
+       std::map<std::string, goopal::blockchain::DelegatePaySalary> Salary_Map;
+
+       auto all_delegate_ids = my->_blockchain->get_delegates_by_vote(0, 99);
+       //FC_ASSERT(my->is_receive_account(delegate_name));
+       auto asset_rec = my->_blockchain->get_asset_entry(AssetIdType(0));
+
+       auto pending_state = my->_blockchain->get_pending_state();
+       
+       for (auto id : all_delegate_ids)
+       {
+           auto delegate_account_entry = pending_state->get_account_entry(id);
+           FC_ASSERT(delegate_account_entry.valid());
+           FC_ASSERT(delegate_account_entry->is_delegate());
+
+           //auto required_fees = get_transaction_fee();
+           DelegatePaySalary delepatbal;
+           delepatbal.total_balance = delegate_account_entry->delegate_info->total_paid;
+           delepatbal.pay_balance = delegate_account_entry->delegate_info->pay_balance;
+           Salary_Map[delegate_account_entry->name] = delepatbal;
+       }
+       
+       return Salary_Map;
+   }
+
 
    WalletTransactionEntry Wallet::withdraw_delegate_pay(
            const string& delegate_name,
-           double real_amount_to_withdraw,
+           const string& real_amount_to_withdraw,
            const string& withdraw_to_account_name,
            bool sign )
    { try {
@@ -2473,7 +2526,16 @@ namespace detail {
        FC_ASSERT( my->is_receive_account( delegate_name ) );
 
        auto asset_rec = my->_blockchain->get_asset_entry( AssetIdType(0) );
-       ShareType amount_to_withdraw((ShareType)(real_amount_to_withdraw * asset_rec->precision));
+
+	   auto ipos = real_amount_to_withdraw.find(".");
+	   if (ipos != string::npos)
+	   {
+		   string str = real_amount_to_withdraw.substr(ipos + 1);
+		   int64_t precision_input = pow(10, str.size());
+		   FC_ASSERT((precision_input <= asset_rec->precision), "Precision is not correct");
+	   }
+	   double dAmountToWithdraw = std::stod(real_amount_to_withdraw);
+	   ShareType amount_to_withdraw((ShareType)(floor(dAmountToWithdraw * asset_rec->precision + 0.5)));
 
        auto delegate_account_entry = my->_blockchain->get_account_entry( delegate_name );
        FC_ASSERT( delegate_account_entry.valid() );
@@ -2622,7 +2684,7 @@ namespace detail {
    }
 
    WalletTransactionEntry Wallet::transfer_asset_to_address(
-           double real_amount_to_transfer,
+           const string& real_amount_to_transfer,
            const string& amount_to_transfer_symbol,
            const string& from_account_name,
 		   const Address& to_address,
@@ -2641,7 +2703,15 @@ namespace detail {
       const auto asset_id = asset_rec->id;
 
       const int64_t precision = asset_rec->precision ? asset_rec->precision : 1;
-      ShareType amount_to_transfer = real_amount_to_transfer * precision;
+	  auto ipos = real_amount_to_transfer.find(".");
+	  if (ipos != string::npos)
+	  {
+		  string str = real_amount_to_transfer.substr(ipos + 1);
+		  int64_t precision_input = pow(10, str.size());
+		  FC_ASSERT((precision_input <= precision), "Precision is not correct");
+	  }
+	  double dAmountToTransfer = std::stod(real_amount_to_transfer);
+	  ShareType amount_to_transfer = floor(dAmountToTransfer * precision + 0.5);
       Asset asset_to_transfer( amount_to_transfer, asset_id );
 
       PrivateKeyType sender_private_key  = get_active_private_key( from_account_name );
@@ -2656,10 +2726,15 @@ namespace detail {
 		  trx.gop_account = gop_account;
 		  trx.gop_inport_asset = asset_to_transfer;
 	  }
+// 	  if (memo_message != "")
+// 	  {
+// 		  trx.AddtionImessage(memo_message);
+// 	  }
       const auto required_fees = get_transaction_fee( asset_to_transfer.asset_id );
+      const auto required_imessage_fee = get_transaction_imessage_fee(memo_message);
       if( required_fees.asset_id == asset_to_transfer.asset_id )
       {
-         my->withdraw_to_transaction( required_fees + asset_to_transfer,
+		  my->withdraw_to_transaction(required_fees + asset_to_transfer + required_imessage_fee,
                                       from_account_name,
                                       trx,
                                       required_signatures );
@@ -2671,7 +2746,7 @@ namespace detail {
                                       trx,
                                       required_signatures );
 
-         my->withdraw_to_transaction( required_fees,
+		 my->withdraw_to_transaction(required_fees + required_imessage_fee,
                                       from_account_name,
                                       trx,
                                       required_signatures );
@@ -2681,16 +2756,20 @@ namespace detail {
       trx.expiration = blockchain::now() + get_transaction_expiration();
       my->set_delegate_slate( trx, strategy );
 
-      if( sign )
-          my->sign_transaction( trx, required_signatures );
+
 
       auto entry = LedgerEntry();
       entry.from_account = sender_public_key;
       entry.amount = asset_to_transfer;
-      if( memo_message != "" )
+      if (memo_message != "")
+      {
           entry.memo = memo_message;
+          trx.AddtionImessage(memo_message);
+      }
       else
           entry.memo = "To: " + string(to_address).substr(0, 8) + "...";
+      if (sign)
+          my->sign_transaction(trx, required_signatures);
 	  try
 	  {
 		  auto account_rec = my->_blockchain->get_account_entry(to_address);
@@ -2709,11 +2788,9 @@ namespace detail {
 	  }
       auto trans_entry = WalletTransactionEntry();
       trans_entry.ledger_entries.push_back(entry);
-      trans_entry.fee = required_fees;
+	  trans_entry.fee = required_fees + required_imessage_fee;
       trans_entry.extra_addresses.push_back(to_address);
       trans_entry.trx = trx;
-
-      if( sign ) my->sign_transaction( trx, required_signatures );
 
       return trans_entry;
    } FC_CAPTURE_AND_RETHROW( (real_amount_to_transfer)(amount_to_transfer_symbol)(from_account_name)(to_address)(memo_message) ) }
@@ -2881,7 +2958,7 @@ namespace detail {
            const string& description,
            const variant& data,
            const string& issuer_account_name,
-           double max_share_supply,
+		   const string& max_share_supply,
            uint64_t precision,
            bool is_market_issued,
            bool sign )
@@ -2916,8 +2993,17 @@ namespace detail {
       required_signatures.insert(oname_rec->active_key());
 
       //check this way to avoid overflow
-      FC_ASSERT(GOP_BLOCKCHAIN_MAX_SHARES / precision > max_share_supply);
-      ShareType max_share_supply_in_internal_units = max_share_supply * precision;
+      
+	  auto ipos = max_share_supply.find(".");
+	  if (ipos != string::npos)
+	  {
+		  string str = max_share_supply.substr(ipos + 1);
+		  int64_t precision_input = pow(10, str.size());
+		  FC_ASSERT((precision_input <= precision), "Precision is not correct");
+	  }
+	  double dAmountToCreate = std::stod(max_share_supply);
+	  ShareType max_share_supply_in_internal_units = floor(dAmountToCreate * precision + 0.5);
+	  FC_ASSERT(GOP_BLOCKCHAIN_MAX_SHARES > max_share_supply_in_internal_units);
       if( NOT is_market_issued )
       {
          trx.create_asset( symbol, asset_name,
@@ -2986,7 +3072,7 @@ namespace detail {
    } FC_CAPTURE_AND_RETHROW( (symbol)(name)(description)(public_data)(precision)(issuer_fee)(restricted)(retractable)(required_sigs)(authority)(sign) ) }
 
    WalletTransactionEntry Wallet::issue_asset(
-           double amount_to_issue,
+           const string& amount_to_issue,
            const string& symbol,
            const string& to_account_name,
            const string& memo_message,
@@ -3008,7 +3094,16 @@ namespace detail {
       FC_ASSERT(issuer_account, "uh oh! no account for valid asset");
       auto authority = asset_entry->authority;
 
-      Asset shares_to_issue( amount_to_issue * asset_entry->precision, asset_entry->id );
+	  auto ipos = amount_to_issue.find(".");
+	  if (ipos != string::npos)
+	  {
+		  string str = amount_to_issue.substr(ipos + 1);
+		  int64_t precision_input = pow(10, str.size());
+		  FC_ASSERT((precision_input <= asset_entry->precision), "Precision is not correct");
+	  }
+	  double dAmountToIssue = std::stod(amount_to_issue);
+
+	  Asset shares_to_issue(floor(dAmountToIssue * asset_entry->precision + 0.5), asset_entry->id);
       my->withdraw_to_transaction( required_fees,
                                    issuer_account->name,
                                    trx,
@@ -3222,7 +3317,28 @@ namespace detail {
 
       my->_wallet_db.set_property( default_transaction_priority_fee, variant( fee ) );
    } FC_CAPTURE_AND_RETHROW( (fee) ) }
-
+   Asset Wallet::get_transaction_imessage_fee(const std::string & imessage)const
+   {
+       try 
+       {
+           FC_ASSERT(is_open(), "Wallet not open!");
+           Asset require_fee;
+           auto max_soft_length = get_transaction_imessage_soft_max_length();
+           if (imessage.size() > max_soft_length)
+           {
+               FC_THROW_EXCEPTION(imessage_size_bigger_than_soft_max_lenth, "Invalid transaction imessage fee coefficient!", ("imessage_size", imessage.size()));
+           }
+           if (GOP_BLOCKCHAIN_MAX_FREE_MESSAGE_SIZE >= imessage.size())
+           {
+             //  require_fee.asset_id = 2;
+               return require_fee;
+           }
+           auto min_fee_coe = get_transaction_imessage_fee_coe();
+           require_fee.amount = min_fee_coe * (imessage.size() - GOP_BLOCKCHAIN_MAX_FREE_MESSAGE_SIZE);
+        //   require_fee.asset_id = 2;
+           return require_fee;
+       }FC_CAPTURE_AND_RETHROW((imessage.size()))
+   }
    Asset Wallet::get_transaction_fee( const AssetIdType desired_fee_asset_id )const
    { try {
       FC_ASSERT( is_open() ,"Wallet not open!");
@@ -3268,7 +3384,13 @@ namespace detail {
        FC_ASSERT( is_open() ,"Wallet not open!");
        my->_wallet_db.set_property( last_unlocked_scanned_block_number, fc::variant( block_num ) );
    } FC_CAPTURE_AND_RETHROW() }
-
+   void Wallet::set_last_scanned_block_number_for_gop(uint32_t block_num)
+   {
+	   try {
+		   FC_ASSERT(is_open(), "Wallet not open!");
+		   my->_wallet_db.set_property(last_scanned_block_number_for_goopal, fc::variant(block_num));
+	   } FC_CAPTURE_AND_RETHROW()
+   }
    uint32_t Wallet::get_last_scanned_block_number()const
    { try {
        FC_ASSERT( is_open() ,"Wallet not open!");
@@ -3281,7 +3403,77 @@ namespace detail {
        }
        return my->_blockchain->get_head_block_num();
    } FC_CAPTURE_AND_RETHROW() }
+   uint32_t Wallet::get_last_scanned_block_number_for_gop()const
+   {
+	   try {
+		   FC_ASSERT(is_open(), "Wallet not open!");
+		   try
+		   {
+			   return my->_wallet_db.get_property(last_scanned_block_number_for_goopal).as<uint32_t>();
+		   }
+		   catch (...)
+		   {
+		   }
+		   return my->_blockchain->get_head_block_num();
+	   } FC_CAPTURE_AND_RETHROW()
+   }
+   void Wallet::set_transaction_imessage_fee_coe(const ImessageIdType& coe)
+   {
+       try 
+       {
+           FC_ASSERT(is_open(), "Wallet not open!");
 
+           if (coe < GOP_BLOCKCHAIN_MIN_MESSAGE_FEE_COE)
+           {
+               FC_THROW_EXCEPTION(invalid_transaction_imessage_fee_coe, "Invalid transaction imessage fee coefficient!", ("fee_coe", coe));
+           }
+           my->_wallet_db.set_property(transaction_min_imessage_fee_coe, fc::variant(coe));
+
+       } FC_CAPTURE_AND_RETHROW()
+   }
+   ImessageIdType Wallet::get_transaction_imessage_fee_coe()const
+   {
+       try 
+       {
+           FC_ASSERT(is_open(), "Wallet not open!");
+           try
+           {
+               return my->_wallet_db.get_property(transaction_min_imessage_fee_coe).as<ImessageIdType>();
+           }
+           catch (...)
+           {
+           }
+           return 0;
+       } FC_CAPTURE_AND_RETHROW()
+   }
+   void Wallet::set_transaction_imessage_soft_max_length(const ImessageLengthIdType& length)
+   {
+       try
+       {
+           FC_ASSERT(is_open(), "Wallet not open!");
+
+           if (length < 0 || length > GOP_BLOCKCHAIN_MAX_MESSAGE_SIZE)
+           {
+               FC_THROW_EXCEPTION(invalid_transaction_imessage_soft_length, "invalid imessage soft max length!", ("length", length));
+           }
+           my->_wallet_db.set_property(transaction_min_imessage_soft_length, fc::variant(length));
+       } FC_CAPTURE_AND_RETHROW()
+   }
+   ImessageLengthIdType Wallet::get_transaction_imessage_soft_max_length()const
+   {
+       try
+       {
+           FC_ASSERT(is_open(), "Wallet not open!");
+           try
+           {
+               return my->_wallet_db.get_property(transaction_min_imessage_soft_length).as<ImessageIdType>();
+           }
+           catch (...)
+           {
+           }
+           return 0;
+       } FC_CAPTURE_AND_RETHROW()
+   }
    void Wallet::set_transaction_expiration(uint32_t secs)
    { try {
        FC_ASSERT( is_open() ,"Wallet not open!");
@@ -3382,6 +3574,30 @@ namespace detail {
 
       return accounts;
    } FC_CAPTURE_AND_RETHROW() }
+
+
+   vector<AccountAddressData> Wallet::list_addresses() const
+   {
+       try {
+           const auto& accs = my->_wallet_db.get_accounts();
+
+           vector<AccountAddressData> receive_accounts;
+           
+           receive_accounts.reserve(accs.size());
+           for (const auto& item : accs)
+               if (item.second.is_my_account)
+               {
+                   receive_accounts.push_back((item.second));
+               }
+
+           std::sort(receive_accounts.begin(), receive_accounts.end(),
+               [](const AccountAddressData& a, const AccountAddressData& b) -> bool
+           { return a.name.compare(b.name) < 0; });
+
+           
+           return receive_accounts;
+       } FC_CAPTURE_AND_RETHROW()   }
+
 
    vector<WalletAccountEntry> Wallet::list_my_accounts() const
    { try {
@@ -3527,6 +3743,22 @@ namespace detail {
       return opt_account->owner_key;
    } FC_CAPTURE_AND_RETHROW( (account_name) ) }
 
+
+   vector<AccountEntry> Wallet::get_all_approved_accounts(const int8_t approval)
+   {
+	   vector<AccountEntry> all_accounts;
+	   std::vector<AccountIdType> delegate_ids = my->_blockchain->get_all_delegates_by_vote();
+	   for (const auto& item : delegate_ids)
+	   {
+		   auto delegate_account = my->_blockchain->get_account_entry(item);
+		   int8_t account_approval = this->get_account_approval(delegate_account->name);
+		   if (approval == account_approval)
+		   {
+			   all_accounts.push_back(*delegate_account);
+		   }
+	   }
+	   return all_accounts;
+   }
 
    void Wallet::clear_account_approval(const string& account_name)
    {

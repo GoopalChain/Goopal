@@ -144,7 +144,17 @@ namespace goopal { namespace blockchain {
        FC_ASSERT( registration_fee > 0,"Registration_fee must be bigger than 0"  );
        return registration_fee;
    }
-
+   ShareType ChainInterface::get_imessage_need_fee(const string & imessage)const
+   {
+       if (imessage.size() < GOP_BLOCKCHAIN_MAX_FREE_MESSAGE_SIZE)
+       {
+           return 0;
+       }
+       ImessageIdType fee_coe = GOP_BLOCKCHAIN_MIN_MESSAGE_FEE_COE;
+       ShareType fee = 0;
+       fee = fee_coe * (imessage.size() - GOP_BLOCKCHAIN_MAX_FREE_MESSAGE_SIZE);
+       return fee;
+   }
    ShareType ChainInterface::get_asset_registration_fee( uint8_t symbol_length )const
    {
       // if( get_head_block_num() < GOP_V0_4_24_FORK_BLOCK_NUM )

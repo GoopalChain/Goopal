@@ -11,9 +11,9 @@
 #define ENABLE_P2P_DEBUGGING_API                        1
 
 /**
- * 512 kb
+ * 512 * GOP_BLOCKCHAIN_MAX_PENDING_QUEUE_SIZE * 10 + 512 kb
  */
-#define MAX_MESSAGE_SIZE                                (512 * 1024)
+#define MAX_MESSAGE_SIZE                                (512 * 1024 * 3)
 #define GOP_NET_DEFAULT_PEER_CONNECTION_RETRY_TIME      30 // seconds
 
 /**
@@ -22,7 +22,7 @@
  */
 #define GOP_PEER_DATABASE_RETRY_DELAY                   15 // seconds
 
-#define GOP_NET_PEER_HANDSHAKE_INACTIVITY_TIMEOUT       5
+#define GOP_NET_PEER_HANDSHAKE_INACTIVITY_TIMEOUT       10
 
 #define GOP_NET_PEER_DISCONNECT_TIMEOUT                 20
 
@@ -33,7 +33,7 @@
 #define GOP_NET_DELEGATE_DESIRED_CONNECTIONS            50
 #define GOP_NET_DEFAULT_MAX_CONNECTIONS                 200
 
-#define GOP_NET_MAXIMUM_QUEUED_MESSAGES_IN_BYTES        (1024 * 1024)
+#define GOP_NET_MAXIMUM_QUEUED_MESSAGES_IN_BYTES        (1024 * 1024 * 3)
 
 /**
  * We prevent a peer from offering us a list of blocks which, if we fetched them

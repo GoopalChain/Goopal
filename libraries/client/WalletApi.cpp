@@ -12,6 +12,7 @@
 #include <fc/reflect/variant.hpp>
 
 #include <fc/thread/non_preemptable_scope_check.hpp>
+#include "Cli/locale.hpp"
 
 namespace goopal { namespace client { namespace detail {
 
@@ -20,6 +21,14 @@ int8_t detail::ClientImpl::wallet_account_set_approval( const string& account_na
   _wallet->set_account_approval( account_name, approval );
   return _wallet->get_account_approval( account_name );
 } FC_RETHROW_EXCEPTIONS( warn, "", ("account_name",account_name)("approval",approval) ) }
+
+std::vector<goopal::blockchain::AccountEntry> ClientImpl::wallet_get_all_approved_accounts(int8_t approval)
+{
+	try{
+		return _wallet->get_all_approved_accounts(approval);
+	}
+	FC_RETHROW_EXCEPTIONS(warn, "account db read fail!")
+}
 
 void detail::ClientImpl::wallet_open(const string& wallet_name)
 {
@@ -265,7 +274,7 @@ bool detail::ClientImpl::wallet_check_address(const std::string& address)
 	}
 }
 
-map<TransactionIdType, fc::exception> detail::ClientImpl::wallet_get_pending_transaction_errors( const string& filename )const
+map<TransactionIdType, fc::exception> detail::ClientImpl::wallet_get_pending_transaction_errors(const goopal::blockchain::FilePath& filename)const
 {
   const auto& errors = _wallet->get_pending_transaction_errors();
   if( filename != "" )
@@ -380,7 +389,7 @@ optional<variant_object> detail::ClientImpl::wallet_verify_titan_deposit( const 
 // }
 
 WalletTransactionEntry detail::ClientImpl::wallet_transfer_to_public_account(
-        double amount_to_transfer,
+        const string& amount_to_transfer,
         const string& asset_symbol,
         const string& from_account_name,
 		const string& to_account_name,
@@ -442,7 +451,7 @@ string  detail::ClientImpl::wallet_address_create( const string& account_name,
 
 
 WalletTransactionEntry detail::ClientImpl::wallet_transfer_to_address(
-        double amount_to_transfer,
+        const string& amount_to_transfer,
         const string& asset_symbol,
         const string& from_account_name,
 		const string& to_address,
@@ -733,7 +742,7 @@ WalletTransactionEntry detail::ClientImpl::wallet_asset_create(
         const string& asset_name,
         const string& issuer_name,
         const string& description,
-        double maximum_share_supply ,
+        const string& maximum_share_supply ,
         uint64_t precision,
         const variant& public_data,
         bool is_market_issued /* = false */ )
@@ -778,7 +787,7 @@ WalletTransactionEntry detail::ClientImpl::wallet_asset_create(
 
 
 WalletTransactionEntry detail::ClientImpl::wallet_asset_issue(
-        double real_amount,
+        const string& real_amount,
         const string& symbol,
         const string& to_account_name,
         const string& memo_message )
@@ -808,6 +817,11 @@ vector<string> detail::ClientImpl::wallet_list() const
 vector<WalletAccountEntry> detail::ClientImpl::wallet_list_accounts() const
 {
   return _wallet->list_accounts();
+}
+
+vector<goopal::wallet::AccountAddressData> detail::ClientImpl::wallet_list_my_addresses() const
+{
+    return _wallet->list_addresses();
 }
 
 vector<WalletAccountEntry> detail::ClientImpl::wallet_list_my_accounts() const
@@ -969,12 +983,12 @@ optional<string> detail::ClientImpl::wallet_dump_account_private_key( const stri
 
 
 
-PublicKeyType ClientImpl::wallet_account_create( const string& account_name,
+Address ClientImpl::wallet_account_create( const string& account_name,
                                                     const variant& private_data )
 {
    const auto result = _wallet->create_account( account_name, private_data );
    _wallet->auto_backup( "account_create" );
-   return result;
+   return Address(result);
 }
 
 // void ClientImpl::wallet_account_set_favorite( const string& account_name, bool is_favorite )
@@ -1175,29 +1189,76 @@ AccountBalanceIdSummaryType ClientImpl::wallet_account_balance_ids( const string
 
 
 
-ShareType ClientImpl::wallet_delegate_pay_balance_query(const string& delegate_name)
+DelegatePaySalary ClientImpl::wallet_delegate_pay_balance_query(const string& delegate_name)
 {
 	auto salary = _wallet->query_delegate_salary(delegate_name);
-
 	return salary;
+}
+
+
+std::map<std::string, goopal::blockchain::DelegatePaySalary>  ClientImpl::wallet_active_delegate_salary()
+{
+    auto salary = _wallet->query_delegate_salarys();
+    return salary;
 }
 
 
 WalletTransactionEntry ClientImpl::wallet_delegate_withdraw_pay( const string& delegate_name,
                                                                     const string& to_account_name,
-                                                                    double amount_to_withdraw )
+                                                                    const string& amount_to_withdraw )
 {
   auto entry = _wallet->withdraw_delegate_pay( delegate_name, amount_to_withdraw, to_account_name, true );
   _wallet->cache_transaction( entry );
   network_broadcast_transaction( entry.trx );
   return entry;
 }
-
-Asset ClientImpl::wallet_set_transaction_fee( double fee )
+void ClientImpl::wallet_set_transaction_imessage_fee_coe(const string& fee_coe)
+{
+    try
+    {
+		auto ipos = fee_coe.find(".");
+		if (ipos != string::npos)
+		{
+			string str = fee_coe.substr(ipos + 1);
+			int64_t precision_input = pow(10, str.size());
+			FC_ASSERT((precision_input <= GOP_BLOCKCHAIN_PRECISION), "Precision is not correct");
+		}
+		double dFee = std::stod(fee_coe);
+		_wallet->set_transaction_imessage_fee_coe(floor(dFee * GOP_BLOCKCHAIN_PRECISION + 0.5));
+    }
+    FC_CAPTURE_AND_RETHROW((fee_coe))
+}
+double ClientImpl::wallet_get_transaction_imessage_fee_coe()
+{
+    auto fee_coe = _wallet->get_transaction_imessage_fee_coe();
+    return ((double)fee_coe) / GOP_BLOCKCHAIN_PRECISION;
+}
+void ClientImpl::wallet_set_transaction_imessage_soft_max_length(int64_t soft_length)
+{
+    try 
+    {
+        _wallet->set_transaction_imessage_soft_max_length(soft_length);
+    }
+    FC_CAPTURE_AND_RETHROW((soft_length))
+}
+int64_t ClientImpl::wallet_get_transaction_imessage_soft_max_length()
+{
+    return _wallet->get_transaction_imessage_soft_max_length();
+}
+Asset ClientImpl::wallet_set_transaction_fee(const string& fee )
 { try {
   oAssetEntry asset_entry = _chain_db->get_asset_entry( AssetIdType() );
   FC_ASSERT( asset_entry.valid() );
-  _wallet->set_transaction_fee( Asset( fee * asset_entry->precision ) );
+  auto ipos = fee.find(".");
+  if (ipos != string::npos)
+  {
+	  string str = fee.substr(ipos + 1);
+	  int64_t precision_input = pow(10, str.size());
+	  FC_ASSERT((precision_input <= asset_entry->precision), "Precision is not correct");
+  }
+  double dFee = std::stod(fee);
+  ShareType amount_to_transfer = floor(dFee * asset_entry->precision + 0.5);
+  _wallet->set_transaction_fee(Asset(dFee * asset_entry->precision));
   return _wallet->get_transaction_fee();
 } FC_CAPTURE_AND_RETHROW( (fee) ) }
 
@@ -1207,9 +1268,6 @@ Asset ClientImpl::wallet_get_transaction_fee( const string& fee_symbol )
      return _wallet->get_transaction_fee( _chain_db->get_asset_id( GOP_BLOCKCHAIN_SYMBOL ) );
   return _wallet->get_transaction_fee( _chain_db->get_asset_id( fee_symbol ) );
 }
-
-
-
 
 AccountVoteSummaryType ClientImpl::wallet_account_vote_summary( const string& account_name )const
 {
@@ -1302,5 +1360,90 @@ int32_t ClientImpl::wallet_regenerate_keys( const std::string& account, uint32_t
    _wallet->auto_backup( "before_key_regeneration" );
    return _wallet->regenerate_keys( account, number_to_regenerate );
 }
+
+
+std::string ClientImpl::wallet_transfer_to_address_rpc(const std::string& amount_to_transfer, const std::string& asset_symbol, const std::string& from_account_name, const std::string& to_address, const goopal::blockchain::Imessage& memo_message /* = fc::json::from_string("").as<std::string>() */, const goopal::wallet::VoteStrategy& strategy /* = fc::json::from_string("vote_recommended").as<bts::wallet::vote_strategy>() */)
+{
+    try{
+        auto  result = wallet_transfer_to_address(amount_to_transfer, asset_symbol,
+            from_account_name, to_address, memo_message, strategy);
+        std::string res = "{\"result\":\"SUCCESS\",\"message\":\"";
+        res += result.entry_id.str();
+        res += "\"}";
+        return res;
+    }
+    catch (fc::exception e)
+    {
+        std::string res = "{\"result\":\"ERROR\",\"message\":\"";
+        res += e.to_string();
+        res += "\"}";
+        return res;
+    }
+}
+
+
+
+std::string detail::ClientImpl::wallet_transfer_to_public_account_rpc(
+    const std::string& amount_to_transfer,
+    const string& asset_symbol,
+    const string& from_account_name,
+    const string& to_account_name,
+    const goopal::blockchain::Imessage& memo_message,
+    const goopal::wallet::VoteStrategy& strategy)
+{
+    const oAccountEntry account_record = _chain_db->get_account_entry(to_account_name);
+    FC_ASSERT(account_record.valid() && !account_record->is_retracted());
+    auto record = _wallet->transfer_asset_to_address(amount_to_transfer,
+        asset_symbol,
+        from_account_name,
+        account_record->active_address(),
+        memo_message,
+        strategy,
+        true);
+    _wallet->cache_transaction(record);
+    network_broadcast_transaction(record.trx);
+    string result = "{\"result\":\"SUCCESS\",\"message\":\"" + string(record.trx.id()) + "\"}";
+
+    return result;
+}
+
+
+string ClientImpl::wallet_account_balance_rpc(const string& account_name)const
+{
+    try{
+        auto result = wallet_account_balance(account_name);
+
+        std::string res = "{\"result\":\"SUCCESS\",\"message\":\"";
+        if (result.begin() == result.end())
+        {
+            res += "0\"}";
+        }
+        else
+        {
+            char buf[52] = { 0 };
+            auto re_val = result.begin()->second;
+            auto resu = re_val.find(goopal::blockchain::Asset(0, 0).asset_id);
+            if (resu == re_val.end())
+            {
+                res += "0\"}";
+            }
+            else
+            {
+                sprintf_s(buf, "%lld", resu->second);
+                res += buf;
+                res += "\"}";
+            }
+        }
+        return res;
+    }
+    catch (fc::exception e)
+    {
+        std::string res = "{\"result\":\"ERROR\",\"message\":\"";
+        res += e.to_string();
+        res += "\"}";
+        return  res;
+    }
+}
+
 
 } } } // namespace goopal::client::detail

@@ -166,8 +166,11 @@ namespace goopal { namespace net {
          *  to attempt to connect to.  This database is consulted any time
          *  the number connected peers falls below the target.
          */
-        void      add_node( const fc::ip::endpoint& ep );
-
+        void      add_node(const fc::ip::endpoint& ep, int32_t oper_flag = 1);
+        /**
+        * Add a node to blacklist
+        */
+        void block_node(std::string node, bool block);
         /**
          *  Attempt to connect to the specified endpoint immediately.
          */
@@ -242,6 +245,7 @@ namespace goopal { namespace net {
         fc::variant_object network_get_usage_stats() const;
 
         std::vector<PotentialPeerEntry> get_potential_peers() const;
+        std::vector<std::string> get_blocked_ips() const;
 
         void disable_peer_advertising();
         fc::variant_object get_call_statistics() const;

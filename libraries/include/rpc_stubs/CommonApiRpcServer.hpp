@@ -63,6 +63,8 @@ namespace goopal { namespace rpc_stubs {
     fc::variant blockchain_list_pending_transactions_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
     fc::variant blockchain_get_transaction_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
     fc::variant blockchain_get_transaction_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
+    fc::variant blockchain_get_pretty_transaction_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
+    fc::variant blockchain_get_pretty_transaction_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
     fc::variant blockchain_get_block_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
     fc::variant blockchain_get_block_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
     fc::variant blockchain_get_block_transactions_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
@@ -111,6 +113,8 @@ namespace goopal { namespace rpc_stubs {
     fc::variant blockchain_broadcast_transaction_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
     fc::variant blockchain_btc_address_convert_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
     fc::variant blockchain_btc_address_convert_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
+    fc::variant blockchain_get_transaction_rpc_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
+    fc::variant blockchain_get_transaction_rpc_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
     fc::variant network_add_node_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
     fc::variant network_add_node_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
     fc::variant network_get_connection_count_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
@@ -133,6 +137,8 @@ namespace goopal { namespace rpc_stubs {
     fc::variant network_list_potential_peers_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
     fc::variant network_get_upnp_info_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
     fc::variant network_get_upnp_info_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
+    fc::variant network_get_blocked_ips_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
+    fc::variant network_get_blocked_ips_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
     fc::variant debug_get_client_name_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
     fc::variant debug_get_client_name_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
     fc::variant delegate_get_config_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
@@ -141,6 +147,10 @@ namespace goopal { namespace rpc_stubs {
     fc::variant delegate_set_network_min_connection_count_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
     fc::variant delegate_set_block_max_transaction_count_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
     fc::variant delegate_set_block_max_transaction_count_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
+    fc::variant delegate_set_soft_max_imessage_length_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
+    fc::variant delegate_set_soft_max_imessage_length_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
+    fc::variant delegate_set_imessage_fee_coe_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
+    fc::variant delegate_set_imessage_fee_coe_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
     fc::variant delegate_set_block_max_size_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
     fc::variant delegate_set_block_max_size_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
     fc::variant delegate_set_transaction_max_size_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
@@ -203,6 +213,8 @@ namespace goopal { namespace rpc_stubs {
     fc::variant wallet_account_create_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
     fc::variant wallet_account_set_approval_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
     fc::variant wallet_account_set_approval_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
+    fc::variant wallet_get_all_approved_accounts_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
+    fc::variant wallet_get_all_approved_accounts_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
     fc::variant wallet_address_create_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
     fc::variant wallet_address_create_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
     fc::variant wallet_transfer_to_address_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
@@ -235,6 +247,8 @@ namespace goopal { namespace rpc_stubs {
     fc::variant wallet_list_unregistered_accounts_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
     fc::variant wallet_list_my_accounts_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
     fc::variant wallet_list_my_accounts_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
+    fc::variant wallet_list_my_addresses_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
+    fc::variant wallet_list_my_addresses_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
     fc::variant wallet_get_account_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
     fc::variant wallet_get_account_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
     fc::variant wallet_get_account_public_address_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
@@ -259,8 +273,18 @@ namespace goopal { namespace rpc_stubs {
     fc::variant wallet_delegate_withdraw_pay_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
     fc::variant wallet_delegate_pay_balance_query_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
     fc::variant wallet_delegate_pay_balance_query_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
+    fc::variant wallet_active_delegate_salary_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
+    fc::variant wallet_active_delegate_salary_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
     fc::variant wallet_get_delegate_statue_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
     fc::variant wallet_get_delegate_statue_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
+    fc::variant wallet_set_transaction_imessage_fee_coe_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
+    fc::variant wallet_set_transaction_imessage_fee_coe_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
+    fc::variant wallet_get_transaction_imessage_fee_coe_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
+    fc::variant wallet_get_transaction_imessage_fee_coe_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
+    fc::variant wallet_set_transaction_imessage_soft_max_length_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
+    fc::variant wallet_set_transaction_imessage_soft_max_length_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
+    fc::variant wallet_get_transaction_imessage_soft_max_length_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
+    fc::variant wallet_get_transaction_imessage_soft_max_length_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
     fc::variant wallet_set_transaction_fee_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
     fc::variant wallet_set_transaction_fee_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
     fc::variant wallet_get_transaction_fee_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
@@ -307,6 +331,12 @@ namespace goopal { namespace rpc_stubs {
     fc::variant wallet_account_retract_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
     fc::variant wallet_account_delete_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
     fc::variant wallet_account_delete_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
+    fc::variant wallet_transfer_to_address_rpc_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
+    fc::variant wallet_transfer_to_address_rpc_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
+    fc::variant wallet_account_balance_rpc_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
+    fc::variant wallet_account_balance_rpc_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
+    fc::variant wallet_transfer_to_public_account_rpc_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
+    fc::variant wallet_transfer_to_public_account_rpc_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
     fc::variant about_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);
     fc::variant about_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters);
     fc::variant get_info_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters);

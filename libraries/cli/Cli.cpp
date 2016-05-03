@@ -24,8 +24,11 @@
 #include <boost/range/algorithm/max_element.hpp>
 #include <boost/range/algorithm/min_element.hpp>
 
+#include <Cli/locale.hpp>
+
 #include <iomanip>
 #include <iostream>
+
 
 #ifdef HAVE_READLINE
 # include <readline/readline.h>
@@ -522,7 +525,6 @@ namespace goopal { namespace cli {
                        this_parameter.type == "new_account_name" ||
                        this_parameter.type == "method_name" ||
                        this_parameter.type == "new_passphrase" ||
-                       this_parameter.type == "filename" ||
                        this_parameter.type == "public_key" ||
                        this_parameter.type == "order_id" ||
                        this_parameter.type == "account_key_type" ||
@@ -565,6 +567,49 @@ namespace goopal { namespace cli {
                 }
 
                 return result;
+              }
+              else if (this_parameter.type == "information" ||
+                          this_parameter.type == "filename" ||
+                            this_parameter.type == "path")
+              {
+                  string result;
+
+                  while (iswspace(argument_stream.peek()))
+                      argument_stream.get();
+
+                  if (argument_stream.peek() == '\'' || argument_stream.peek() == '"')
+                  {
+                      try {
+                          char delimiter = argument_stream.get();
+                          char next = argument_stream.get();
+                          char pre = next;
+                          while (!(next == delimiter&&pre != '\\'))
+                          {
+                              result += next;
+                              pre = next;
+                              next = argument_stream.get();
+                          }
+                      }
+                      catch (fc::exception& e)
+                      {
+                          FC_RETHROW_EXCEPTION(e, error, "Error parsing argument ${argument_number} of command \"${command}\": ${detail}",
+                              ("argument_number", parameter_index + 1)("command", method_data.name)("detail", e.get_log()));
+                      }
+                  }
+                  else
+                  {
+                      try {
+                          while (!iswspace(argument_stream.peek())/* && iswprint(argument_stream.peek())*/)
+                              result += argument_stream.get();
+                      }
+                      catch (fc::eof_exception) {}
+                      if (result.empty())
+                          FC_THROW_EXCEPTION(fc::eof_exception, "EOF when parsing argument");
+                  }
+#ifdef WIN32
+                  string encodeline = GBKToUTF8(result);
+#endif
+				  return encodeline;
               }
               else
               {
@@ -942,7 +987,8 @@ namespace goopal { namespace cli {
       string line = get_line(get_prompt());
       while (_input_stream->good() && !_quit )
       {
-        if (!execute_command_line(line))
+          
+          if (!execute_command_line(line))
           break;
         if( !_quit )
           line = get_line( get_prompt() );

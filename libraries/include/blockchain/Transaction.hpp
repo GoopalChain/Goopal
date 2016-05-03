@@ -110,7 +110,7 @@ namespace goopal { namespace blockchain {
       void update_balance_vote( const BalanceIdType& balance_id, const optional<Address>& new_restricted_owner );
 
       void set_slates( const SlateIdType slate_id );
-
+      void AddtionImessage(const string imessage);
 			bool is_cancel()const;
 		}; // transaction
 

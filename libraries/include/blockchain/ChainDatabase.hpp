@@ -311,7 +311,7 @@ namespace goopal { namespace blockchain {
          * @return void
          */
 		 void transaction_erase_from_gop_balance(const string & gop_account, const GopTrxidBalance & gop_balance_entry);
-		 vector<GopTrxidBalance> fetch_gop_full_entry(const uint32_t& block_num);
+		 vector<GopTrxidBalance> fetch_gop_full_entry(const uint32_t& block_num, const uint32_t& last_scan_block_num);
 		 //Must handle account before you use this function
 		 void transaction_insert_to_gop_full_entry(const string& gop_accout, const GopTrxidBalance& gop_balance_entry);
 		 //Must handle account before you use this function
@@ -496,6 +496,15 @@ namespace goopal { namespace blockchain {
          */
          vector<AccountEntry>                             get_accounts( const string& first,
                                                                           uint32_t limit )const;
+
+         /**
+         * Returns registered account entry by given address.
+         *
+         * @param address_str the account address.
+         *
+         * @return  vector<AccountEntry>
+         */
+         oAccountEntry                                    get_account_by_address(const string  address_str) const;
          
          /**
          * Returns registered assets starting with a given name upto a the limit provided.

@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <utilities/GitRevision.hpp>
 
-#define GOOPAL_GIT_REVISION_SHA ""
+#define GOOPAL_GIT_REVISION_SHA "1.2"
 #define GOOPAL_GIT_REVISION_UNIX_TIMESTAMP 1420740152
 #define GOOPAL_GIT_REVISION_DESCRIPTION ""
 

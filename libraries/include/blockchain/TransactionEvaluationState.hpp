@@ -66,7 +66,6 @@ namespace goopal { namespace blockchain {
          void scan_addresses( const ChainInterface&, const function<void( const Address& )> callback )const;
 
          SignedTransaction                             trx;
-
          set<Address>                                   signed_keys;
 
          // increases with funds are withdrawn, decreases when funds are deposited or fees paid
@@ -99,6 +98,7 @@ namespace goopal { namespace blockchain {
 
          unordered_map<AccountIdType, ShareType>     delegate_vote_deltas;
 
+         ImessageIdType                                imessage_length;
          // Not serialized
          ChainInterface*                               _current_state = nullptr;
 
@@ -127,4 +127,5 @@ FC_REFLECT( goopal::blockchain::TransactionEvaluationState,
         (alt_fees_paid)
         (balance)
         (delegate_vote_deltas)
+        (imessage_length)
         )

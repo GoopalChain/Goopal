@@ -352,7 +352,7 @@ std::vector<goopal::blockchain::AssetEntry> CommonApiClient::blockchain_list_ass
   FC_RETHROW_EXCEPTIONS(warn, "")
 }
 
-std::vector<goopal::blockchain::SignedTransaction> CommonApiClient::blockchain_list_pending_transactions() const
+std::vector<std::pair<goopal::blockchain::TransactionIdType, goopal::blockchain::SignedTransaction>> CommonApiClient::blockchain_list_pending_transactions() const
 {
   ilog("received RPC call: blockchain_list_pending_transactions()", );
   goopal::api::GlobalApiLogger* glog = goopal::api::GlobalApiLogger::get_instance();
@@ -371,7 +371,7 @@ std::vector<goopal::blockchain::SignedTransaction> CommonApiClient::blockchain_l
   } execution_time_logger;
   try
   {
-    std::vector<goopal::blockchain::SignedTransaction> result = get_impl()->blockchain_list_pending_transactions();
+    std::vector<std::pair<goopal::blockchain::TransactionIdType, goopal::blockchain::SignedTransaction>> result = get_impl()->blockchain_list_pending_transactions();
     if( call_id != 0 )
       glog->log_call_finished( call_id, this, "blockchain_list_pending_transactions", args, fc::variant(result) );
 
@@ -404,6 +404,36 @@ std::pair<goopal::blockchain::TransactionIdType, goopal::blockchain::Transaction
     std::pair<goopal::blockchain::TransactionIdType, goopal::blockchain::TransactionEntry> result = get_impl()->blockchain_get_transaction(transaction_id_prefix, exact);
     if( call_id != 0 )
       glog->log_call_finished( call_id, this, "blockchain_get_transaction", args, fc::variant(result) );
+
+    return result;
+  }
+  FC_RETHROW_EXCEPTIONS(warn, "")
+}
+
+goopal::wallet::PrettyTransaction CommonApiClient::blockchain_get_pretty_transaction(const std::string& transaction_id_prefix, bool exact /* = fc::json::from_string("false").as<bool>() */) const
+{
+  ilog("received RPC call: blockchain_get_pretty_transaction(${transaction_id_prefix}, ${exact})", ("transaction_id_prefix", transaction_id_prefix)("exact", exact));
+  goopal::api::GlobalApiLogger* glog = goopal::api::GlobalApiLogger::get_instance();
+  uint64_t call_id = 0;
+  fc::variants args;
+  if( glog != NULL )
+  {
+    args.push_back( fc::variant(transaction_id_prefix) );
+    args.push_back( fc::variant(exact) );
+    call_id = glog->log_call_started( this, "blockchain_get_pretty_transaction", args );
+  }
+
+  struct scope_exit
+  {
+    fc::time_point start_time;
+    scope_exit() : start_time(fc::time_point::now()) {}
+    ~scope_exit() { dlog("RPC call blockchain_get_pretty_transaction finished in ${time} ms", ("time", (fc::time_point::now() - start_time).count() / 1000)); }
+  } execution_time_logger;
+  try
+  {
+    goopal::wallet::PrettyTransaction result = get_impl()->blockchain_get_pretty_transaction(transaction_id_prefix, exact);
+    if( call_id != 0 )
+      glog->log_call_finished( call_id, this, "blockchain_get_pretty_transaction", args, fc::variant(result) );
 
     return result;
   }
@@ -851,7 +881,7 @@ std::vector<std::string> CommonApiClient::blockchain_list_missing_block_delegate
   FC_RETHROW_EXCEPTIONS(warn, "")
 }
 
-std::string CommonApiClient::blockchain_export_fork_graph(uint32_t start_block /* = fc::json::from_string("1").as<uint32_t>() */, uint32_t end_block /* = fc::json::from_string("-1").as<uint32_t>() */, const std::string& filename /* = fc::json::from_string("\"\"").as<std::string>() */) const
+std::string CommonApiClient::blockchain_export_fork_graph(uint32_t start_block /* = fc::json::from_string("1").as<uint32_t>() */, uint32_t end_block /* = fc::json::from_string("-1").as<uint32_t>() */, const goopal::blockchain::FilePath& filename /* = fc::json::from_string("\"\"").as<goopal::blockchain::FilePath>() */) const
 {
   ilog("received RPC call: blockchain_export_fork_graph(${start_block}, ${end_block}, ${filename})", ("start_block", start_block)("end_block", end_block)("filename", filename));
   goopal::api::GlobalApiLogger* glog = goopal::api::GlobalApiLogger::get_instance();
@@ -1114,6 +1144,36 @@ void CommonApiClient::blockchain_btc_address_convert(const std::string& path) co
       glog->log_call_finished( call_id, this, "blockchain_btc_address_convert", args, fc::variant(result) );
 
     return;
+  }
+  FC_RETHROW_EXCEPTIONS(warn, "")
+}
+
+std::string CommonApiClient::blockchain_get_transaction_rpc(const std::string& transaction_id_prefix, bool exact /* = fc::json::from_string("false").as<bool>() */) const
+{
+  ilog("received RPC call: blockchain_get_transaction_rpc(${transaction_id_prefix}, ${exact})", ("transaction_id_prefix", transaction_id_prefix)("exact", exact));
+  goopal::api::GlobalApiLogger* glog = goopal::api::GlobalApiLogger::get_instance();
+  uint64_t call_id = 0;
+  fc::variants args;
+  if( glog != NULL )
+  {
+    args.push_back( fc::variant(transaction_id_prefix) );
+    args.push_back( fc::variant(exact) );
+    call_id = glog->log_call_started( this, "blockchain_get_transaction_rpc", args );
+  }
+
+  struct scope_exit
+  {
+    fc::time_point start_time;
+    scope_exit() : start_time(fc::time_point::now()) {}
+    ~scope_exit() { dlog("RPC call blockchain_get_transaction_rpc finished in ${time} ms", ("time", (fc::time_point::now() - start_time).count() / 1000)); }
+  } execution_time_logger;
+  try
+  {
+    std::string result = get_impl()->blockchain_get_transaction_rpc(transaction_id_prefix, exact);
+    if( call_id != 0 )
+      glog->log_call_finished( call_id, this, "blockchain_get_transaction_rpc", args, fc::variant(result) );
+
+    return result;
   }
   FC_RETHROW_EXCEPTIONS(warn, "")
 }
@@ -1435,6 +1495,34 @@ fc::variant_object CommonApiClient::network_get_upnp_info() const
   FC_RETHROW_EXCEPTIONS(warn, "")
 }
 
+std::vector<std::string> CommonApiClient::network_get_blocked_ips() const
+{
+  ilog("received RPC call: network_get_blocked_ips()", );
+  goopal::api::GlobalApiLogger* glog = goopal::api::GlobalApiLogger::get_instance();
+  uint64_t call_id = 0;
+  fc::variants args;
+  if( glog != NULL )
+  {
+    call_id = glog->log_call_started( this, "network_get_blocked_ips", args );
+  }
+
+  struct scope_exit
+  {
+    fc::time_point start_time;
+    scope_exit() : start_time(fc::time_point::now()) {}
+    ~scope_exit() { dlog("RPC call network_get_blocked_ips finished in ${time} ms", ("time", (fc::time_point::now() - start_time).count() / 1000)); }
+  } execution_time_logger;
+  try
+  {
+    std::vector<std::string> result = get_impl()->network_get_blocked_ips();
+    if( call_id != 0 )
+      glog->log_call_finished( call_id, this, "network_get_blocked_ips", args, fc::variant(result) );
+
+    return result;
+  }
+  FC_RETHROW_EXCEPTIONS(warn, "")
+}
+
 std::string CommonApiClient::debug_get_client_name() const
 {
   ilog("received RPC call: debug_get_client_name()", );
@@ -1545,6 +1633,66 @@ void CommonApiClient::delegate_set_block_max_transaction_count(uint32_t count)
     get_impl()->delegate_set_block_max_transaction_count(count);
     if( call_id != 0 )
       glog->log_call_finished( call_id, this, "delegate_set_block_max_transaction_count", args, fc::variant(result) );
+
+    return;
+  }
+  FC_RETHROW_EXCEPTIONS(warn, "")
+}
+
+void CommonApiClient::delegate_set_soft_max_imessage_length(int64_t soft_length)
+{
+  ilog("received RPC call: delegate_set_soft_max_imessage_length(${soft_length})", ("soft_length", soft_length));
+  goopal::api::GlobalApiLogger* glog = goopal::api::GlobalApiLogger::get_instance();
+  uint64_t call_id = 0;
+  fc::variants args;
+  if( glog != NULL )
+  {
+    args.push_back( fc::variant(soft_length) );
+    call_id = glog->log_call_started( this, "delegate_set_soft_max_imessage_length", args );
+  }
+
+  struct scope_exit
+  {
+    fc::time_point start_time;
+    scope_exit() : start_time(fc::time_point::now()) {}
+    ~scope_exit() { dlog("RPC call delegate_set_soft_max_imessage_length finished in ${time} ms", ("time", (fc::time_point::now() - start_time).count() / 1000)); }
+  } execution_time_logger;
+  try
+  {
+    std::nullptr_t result = nullptr;
+    get_impl()->delegate_set_soft_max_imessage_length(soft_length);
+    if( call_id != 0 )
+      glog->log_call_finished( call_id, this, "delegate_set_soft_max_imessage_length", args, fc::variant(result) );
+
+    return;
+  }
+  FC_RETHROW_EXCEPTIONS(warn, "")
+}
+
+void CommonApiClient::delegate_set_imessage_fee_coe(const std::string& fee_coe)
+{
+  ilog("received RPC call: delegate_set_imessage_fee_coe(${fee_coe})", ("fee_coe", fee_coe));
+  goopal::api::GlobalApiLogger* glog = goopal::api::GlobalApiLogger::get_instance();
+  uint64_t call_id = 0;
+  fc::variants args;
+  if( glog != NULL )
+  {
+    args.push_back( fc::variant(fee_coe) );
+    call_id = glog->log_call_started( this, "delegate_set_imessage_fee_coe", args );
+  }
+
+  struct scope_exit
+  {
+    fc::time_point start_time;
+    scope_exit() : start_time(fc::time_point::now()) {}
+    ~scope_exit() { dlog("RPC call delegate_set_imessage_fee_coe finished in ${time} ms", ("time", (fc::time_point::now() - start_time).count() / 1000)); }
+  } execution_time_logger;
+  try
+  {
+    std::nullptr_t result = nullptr;
+    get_impl()->delegate_set_imessage_fee_coe(fee_coe);
+    if( call_id != 0 )
+      glog->log_call_finished( call_id, this, "delegate_set_imessage_fee_coe", args, fc::variant(result) );
 
     return;
   }
@@ -2227,7 +2375,7 @@ void CommonApiClient::wallet_remove_transaction(const std::string& transaction_i
   FC_RETHROW_EXCEPTIONS(warn, "")
 }
 
-std::map<goopal::blockchain::TransactionIdType, fc::exception> CommonApiClient::wallet_get_pending_transaction_errors(const std::string& filename /* = fc::json::from_string("\"\"").as<std::string>() */) const
+std::map<goopal::blockchain::TransactionIdType, fc::exception> CommonApiClient::wallet_get_pending_transaction_errors(const goopal::blockchain::FilePath& filename /* = fc::json::from_string("\"\"").as<goopal::blockchain::FilePath>() */) const
 {
   ilog("received RPC call: wallet_get_pending_transaction_errors(${filename})", ("filename", filename));
   goopal::api::GlobalApiLogger* glog = goopal::api::GlobalApiLogger::get_instance();
@@ -2445,7 +2593,7 @@ std::vector<std::string> CommonApiClient::wallet_list() const
   FC_RETHROW_EXCEPTIONS(warn, "")
 }
 
-goopal::blockchain::PublicKeyType CommonApiClient::wallet_account_create(const std::string& account_name, const fc::variant& private_data /* = fc::json::from_string("null").as<fc::variant>() */)
+goopal::blockchain::Address CommonApiClient::wallet_account_create(const std::string& account_name, const fc::variant& private_data /* = fc::json::from_string("null").as<fc::variant>() */)
 {
   ilog("received RPC call: wallet_account_create(${account_name}, ${private_data})", ("account_name", account_name)("private_data", private_data));
   goopal::api::GlobalApiLogger* glog = goopal::api::GlobalApiLogger::get_instance();
@@ -2466,7 +2614,7 @@ goopal::blockchain::PublicKeyType CommonApiClient::wallet_account_create(const s
   } execution_time_logger;
   try
   {
-    goopal::blockchain::PublicKeyType result = get_impl()->wallet_account_create(account_name, private_data);
+    goopal::blockchain::Address result = get_impl()->wallet_account_create(account_name, private_data);
     if( call_id != 0 )
       glog->log_call_finished( call_id, this, "wallet_account_create", args, fc::variant(result) );
 
@@ -2505,6 +2653,35 @@ int8_t CommonApiClient::wallet_account_set_approval(const std::string& account_n
   FC_RETHROW_EXCEPTIONS(warn, "")
 }
 
+std::vector<goopal::blockchain::AccountEntry> CommonApiClient::wallet_get_all_approved_accounts(int8_t approval /* = fc::json::from_string("1").as<int8_t>() */)
+{
+  ilog("received RPC call: wallet_get_all_approved_accounts(${approval})", ("approval", approval));
+  goopal::api::GlobalApiLogger* glog = goopal::api::GlobalApiLogger::get_instance();
+  uint64_t call_id = 0;
+  fc::variants args;
+  if( glog != NULL )
+  {
+    args.push_back( fc::variant(approval) );
+    call_id = glog->log_call_started( this, "wallet_get_all_approved_accounts", args );
+  }
+
+  struct scope_exit
+  {
+    fc::time_point start_time;
+    scope_exit() : start_time(fc::time_point::now()) {}
+    ~scope_exit() { dlog("RPC call wallet_get_all_approved_accounts finished in ${time} ms", ("time", (fc::time_point::now() - start_time).count() / 1000)); }
+  } execution_time_logger;
+  try
+  {
+    std::vector<goopal::blockchain::AccountEntry> result = get_impl()->wallet_get_all_approved_accounts(approval);
+    if( call_id != 0 )
+      glog->log_call_finished( call_id, this, "wallet_get_all_approved_accounts", args, fc::variant(result) );
+
+    return result;
+  }
+  FC_RETHROW_EXCEPTIONS(warn, "")
+}
+
 std::string CommonApiClient::wallet_address_create(const std::string& account_name, const std::string& label /* = fc::json::from_string("\"\"").as<std::string>() */, int32_t legacy_network_byte /* = fc::json::from_string("-1").as<int32_t>() */)
 {
   ilog("received RPC call: wallet_address_create(${account_name}, ${label}, ${legacy_network_byte})", ("account_name", account_name)("label", label)("legacy_network_byte", legacy_network_byte));
@@ -2536,7 +2713,7 @@ std::string CommonApiClient::wallet_address_create(const std::string& account_na
   FC_RETHROW_EXCEPTIONS(warn, "")
 }
 
-goopal::wallet::WalletTransactionEntry CommonApiClient::wallet_transfer_to_address(double amount_to_transfer, const std::string& asset_symbol, const std::string& from_account_name, const std::string& to_address, const std::string& memo_message /* = fc::json::from_string("\"\"").as<std::string>() */, const goopal::wallet::VoteStrategy& strategy /* = fc::json::from_string("\"vote_recommended\"").as<goopal::wallet::VoteStrategy>() */)
+goopal::wallet::WalletTransactionEntry CommonApiClient::wallet_transfer_to_address(const std::string& amount_to_transfer, const std::string& asset_symbol, const std::string& from_account_name, const std::string& to_address, const goopal::blockchain::Imessage& memo_message /* = fc::json::from_string("\"\"").as<goopal::blockchain::Imessage>() */, const goopal::wallet::VoteStrategy& strategy /* = fc::json::from_string("\"vote_recommended\"").as<goopal::wallet::VoteStrategy>() */)
 {
   ilog("received RPC call: wallet_transfer_to_address(${amount_to_transfer}, ${asset_symbol}, ${from_account_name}, ${to_address}, ${memo_message}, ${strategy})", ("amount_to_transfer", amount_to_transfer)("asset_symbol", asset_symbol)("from_account_name", from_account_name)("to_address", to_address)("memo_message", memo_message)("strategy", strategy));
   goopal::api::GlobalApiLogger* glog = goopal::api::GlobalApiLogger::get_instance();
@@ -2570,7 +2747,7 @@ goopal::wallet::WalletTransactionEntry CommonApiClient::wallet_transfer_to_addre
   FC_RETHROW_EXCEPTIONS(warn, "")
 }
 
-goopal::wallet::WalletTransactionEntry CommonApiClient::wallet_transfer_to_public_account(double amount_to_transfer, const std::string& asset_symbol, const std::string& from_account_name, const std::string& to_account_name, const std::string& memo_message /* = fc::json::from_string("\"\"").as<std::string>() */, const goopal::wallet::VoteStrategy& strategy /* = fc::json::from_string("\"vote_recommended\"").as<goopal::wallet::VoteStrategy>() */)
+goopal::wallet::WalletTransactionEntry CommonApiClient::wallet_transfer_to_public_account(const std::string& amount_to_transfer, const std::string& asset_symbol, const std::string& from_account_name, const std::string& to_account_name, const goopal::blockchain::Imessage& memo_message /* = fc::json::from_string("\"\"").as<goopal::blockchain::Imessage>() */, const goopal::wallet::VoteStrategy& strategy /* = fc::json::from_string("\"vote_recommended\"").as<goopal::wallet::VoteStrategy>() */)
 {
   ilog("received RPC call: wallet_transfer_to_public_account(${amount_to_transfer}, ${asset_symbol}, ${from_account_name}, ${to_account_name}, ${memo_message}, ${strategy})", ("amount_to_transfer", amount_to_transfer)("asset_symbol", asset_symbol)("from_account_name", from_account_name)("to_account_name", to_account_name)("memo_message", memo_message)("strategy", strategy));
   goopal::api::GlobalApiLogger* glog = goopal::api::GlobalApiLogger::get_instance();
@@ -2999,6 +3176,34 @@ std::vector<goopal::wallet::WalletAccountEntry> CommonApiClient::wallet_list_my_
   FC_RETHROW_EXCEPTIONS(warn, "")
 }
 
+std::vector<goopal::wallet::AccountAddressData> CommonApiClient::wallet_list_my_addresses() const
+{
+  ilog("received RPC call: wallet_list_my_addresses()", );
+  goopal::api::GlobalApiLogger* glog = goopal::api::GlobalApiLogger::get_instance();
+  uint64_t call_id = 0;
+  fc::variants args;
+  if( glog != NULL )
+  {
+    call_id = glog->log_call_started( this, "wallet_list_my_addresses", args );
+  }
+
+  struct scope_exit
+  {
+    fc::time_point start_time;
+    scope_exit() : start_time(fc::time_point::now()) {}
+    ~scope_exit() { dlog("RPC call wallet_list_my_addresses finished in ${time} ms", ("time", (fc::time_point::now() - start_time).count() / 1000)); }
+  } execution_time_logger;
+  try
+  {
+    std::vector<goopal::wallet::AccountAddressData> result = get_impl()->wallet_list_my_addresses();
+    if( call_id != 0 )
+      glog->log_call_finished( call_id, this, "wallet_list_my_addresses", args, fc::variant(result) );
+
+    return result;
+  }
+  FC_RETHROW_EXCEPTIONS(warn, "")
+}
+
 goopal::wallet::WalletAccountEntry CommonApiClient::wallet_get_account(const std::string& account_name) const
 {
   ilog("received RPC call: wallet_get_account(${account_name})", ("account_name", account_name));
@@ -3118,7 +3323,7 @@ void CommonApiClient::wallet_account_rename(const std::string& current_account_n
   FC_RETHROW_EXCEPTIONS(warn, "")
 }
 
-goopal::wallet::WalletTransactionEntry CommonApiClient::wallet_asset_create(const std::string& symbol, const std::string& asset_name, const std::string& issuer_name, const std::string& description, double maximum_share_supply, uint64_t precision, const fc::variant& public_data /* = fc::json::from_string("null").as<fc::variant>() */, bool is_market_issued /* = fc::json::from_string("false").as<bool>() */)
+goopal::wallet::WalletTransactionEntry CommonApiClient::wallet_asset_create(const std::string& symbol, const std::string& asset_name, const std::string& issuer_name, const std::string& description, const std::string& maximum_share_supply, uint64_t precision, const fc::variant& public_data /* = fc::json::from_string("null").as<fc::variant>() */, bool is_market_issued /* = fc::json::from_string("false").as<bool>() */)
 {
   ilog("received RPC call: wallet_asset_create(${symbol}, ${asset_name}, ${issuer_name}, ${description}, ${maximum_share_supply}, ${precision}, ${public_data}, ${is_market_issued})", ("symbol", symbol)("asset_name", asset_name)("issuer_name", issuer_name)("description", description)("maximum_share_supply", maximum_share_supply)("precision", precision)("public_data", public_data)("is_market_issued", is_market_issued));
   goopal::api::GlobalApiLogger* glog = goopal::api::GlobalApiLogger::get_instance();
@@ -3154,7 +3359,7 @@ goopal::wallet::WalletTransactionEntry CommonApiClient::wallet_asset_create(cons
   FC_RETHROW_EXCEPTIONS(warn, "")
 }
 
-goopal::wallet::WalletTransactionEntry CommonApiClient::wallet_asset_issue(double amount, const std::string& symbol, const std::string& to_account_name, const std::string& memo_message /* = fc::json::from_string("\"\"").as<std::string>() */)
+goopal::wallet::WalletTransactionEntry CommonApiClient::wallet_asset_issue(const std::string& amount, const std::string& symbol, const std::string& to_account_name, const goopal::blockchain::Imessage& memo_message /* = fc::json::from_string("\"\"").as<goopal::blockchain::Imessage>() */)
 {
   ilog("received RPC call: wallet_asset_issue(${amount}, ${symbol}, ${to_account_name}, ${memo_message})", ("amount", amount)("symbol", symbol)("to_account_name", to_account_name)("memo_message", memo_message));
   goopal::api::GlobalApiLogger* glog = goopal::api::GlobalApiLogger::get_instance();
@@ -3303,7 +3508,7 @@ std::vector<goopal::wallet::PublicKeySummary> CommonApiClient::wallet_account_li
   FC_RETHROW_EXCEPTIONS(warn, "")
 }
 
-goopal::wallet::WalletTransactionEntry CommonApiClient::wallet_delegate_withdraw_pay(const std::string& delegate_name, const std::string& to_account_name, double amount_to_withdraw)
+goopal::wallet::WalletTransactionEntry CommonApiClient::wallet_delegate_withdraw_pay(const std::string& delegate_name, const std::string& to_account_name, const std::string& amount_to_withdraw)
 {
   ilog("received RPC call: wallet_delegate_withdraw_pay(${delegate_name}, ${to_account_name}, ${amount_to_withdraw})", ("delegate_name", delegate_name)("to_account_name", to_account_name)("amount_to_withdraw", amount_to_withdraw));
   goopal::api::GlobalApiLogger* glog = goopal::api::GlobalApiLogger::get_instance();
@@ -3334,7 +3539,7 @@ goopal::wallet::WalletTransactionEntry CommonApiClient::wallet_delegate_withdraw
   FC_RETHROW_EXCEPTIONS(warn, "")
 }
 
-int64_t CommonApiClient::wallet_delegate_pay_balance_query(const std::string& delegate_name)
+goopal::blockchain::DelegatePaySalary CommonApiClient::wallet_delegate_pay_balance_query(const std::string& delegate_name)
 {
   ilog("received RPC call: wallet_delegate_pay_balance_query(${delegate_name})", ("delegate_name", delegate_name));
   goopal::api::GlobalApiLogger* glog = goopal::api::GlobalApiLogger::get_instance();
@@ -3354,7 +3559,7 @@ int64_t CommonApiClient::wallet_delegate_pay_balance_query(const std::string& de
   } execution_time_logger;
   try
   {
-    int64_t result = get_impl()->wallet_delegate_pay_balance_query(delegate_name);
+    goopal::blockchain::DelegatePaySalary result = get_impl()->wallet_delegate_pay_balance_query(delegate_name);
     if( call_id != 0 )
       glog->log_call_finished( call_id, this, "wallet_delegate_pay_balance_query", args, fc::variant(result) );
 
@@ -3392,7 +3597,151 @@ bool CommonApiClient::wallet_get_delegate_statue(const std::string& account_name
   FC_RETHROW_EXCEPTIONS(warn, "")
 }
 
-goopal::blockchain::Asset CommonApiClient::wallet_set_transaction_fee(double fee)
+void CommonApiClient::wallet_set_transaction_imessage_fee_coe(const std::string& fee_coe)
+{
+  ilog("received RPC call: wallet_set_transaction_imessage_fee_coe(${fee_coe})", ("fee_coe", fee_coe));
+  goopal::api::GlobalApiLogger* glog = goopal::api::GlobalApiLogger::get_instance();
+  uint64_t call_id = 0;
+  fc::variants args;
+  if( glog != NULL )
+  {
+    args.push_back( fc::variant(fee_coe) );
+    call_id = glog->log_call_started( this, "wallet_set_transaction_imessage_fee_coe", args );
+  }
+
+  struct scope_exit
+  {
+    fc::time_point start_time;
+    scope_exit() : start_time(fc::time_point::now()) {}
+    ~scope_exit() { dlog("RPC call wallet_set_transaction_imessage_fee_coe finished in ${time} ms", ("time", (fc::time_point::now() - start_time).count() / 1000)); }
+  } execution_time_logger;
+  try
+  {
+    std::nullptr_t result = nullptr;
+    get_impl()->wallet_set_transaction_imessage_fee_coe(fee_coe);
+    if( call_id != 0 )
+      glog->log_call_finished( call_id, this, "wallet_set_transaction_imessage_fee_coe", args, fc::variant(result) );
+
+    return;
+  }
+  FC_RETHROW_EXCEPTIONS(warn, "")
+}
+
+double CommonApiClient::wallet_get_transaction_imessage_fee_coe()
+{
+  ilog("received RPC call: wallet_get_transaction_imessage_fee_coe()", );
+  goopal::api::GlobalApiLogger* glog = goopal::api::GlobalApiLogger::get_instance();
+  uint64_t call_id = 0;
+  fc::variants args;
+  if( glog != NULL )
+  {
+    call_id = glog->log_call_started( this, "wallet_get_transaction_imessage_fee_coe", args );
+  }
+
+  struct scope_exit
+  {
+    fc::time_point start_time;
+    scope_exit() : start_time(fc::time_point::now()) {}
+    ~scope_exit() { dlog("RPC call wallet_get_transaction_imessage_fee_coe finished in ${time} ms", ("time", (fc::time_point::now() - start_time).count() / 1000)); }
+  } execution_time_logger;
+  try
+  {
+    double result = get_impl()->wallet_get_transaction_imessage_fee_coe();
+    if( call_id != 0 )
+      glog->log_call_finished( call_id, this, "wallet_get_transaction_imessage_fee_coe", args, fc::variant(result) );
+
+    return result;
+  }
+  FC_RETHROW_EXCEPTIONS(warn, "")
+}
+std::map<std::string,goopal::blockchain::DelegatePaySalary> CommonApiClient::wallet_active_delegate_salary()
+{
+  ilog("received RPC call: wallet_active_delegate_salary()", );
+  goopal::api::GlobalApiLogger* glog = goopal::api::GlobalApiLogger::get_instance();
+  uint64_t call_id = 0;
+  fc::variants args;
+  if( glog != NULL )
+  {
+    call_id = glog->log_call_started( this, "wallet_active_delegate_salary", args );
+  }
+
+  struct scope_exit
+  {
+    fc::time_point start_time;
+    scope_exit() : start_time(fc::time_point::now()) {}
+    ~scope_exit() { dlog("RPC call wallet_active_delegate_salary finished in ${time} ms", ("time", (fc::time_point::now() - start_time).count() / 1000)); }
+  } execution_time_logger;
+  try
+  {
+    std::map<std::string,goopal::blockchain::DelegatePaySalary> result = get_impl()->wallet_active_delegate_salary();
+    if( call_id != 0 )
+      glog->log_call_finished( call_id, this, "wallet_active_delegate_salary", args, fc::variant(result) );
+
+    return result;
+  }
+  FC_RETHROW_EXCEPTIONS(warn, "")
+}
+
+
+void CommonApiClient::wallet_set_transaction_imessage_soft_max_length(int64_t soft_length)
+{
+  ilog("received RPC call: wallet_set_transaction_imessage_soft_max_length(${soft_length})", ("soft_length", soft_length));
+  goopal::api::GlobalApiLogger* glog = goopal::api::GlobalApiLogger::get_instance();
+  uint64_t call_id = 0;
+  fc::variants args;
+  if( glog != NULL )
+  {
+    args.push_back( fc::variant(soft_length) );
+    call_id = glog->log_call_started( this, "wallet_set_transaction_imessage_soft_max_length", args );
+  }
+
+  struct scope_exit
+  {
+    fc::time_point start_time;
+    scope_exit() : start_time(fc::time_point::now()) {}
+    ~scope_exit() { dlog("RPC call wallet_set_transaction_imessage_soft_max_length finished in ${time} ms", ("time", (fc::time_point::now() - start_time).count() / 1000)); }
+  } execution_time_logger;
+  try
+  {
+    std::nullptr_t result = nullptr;
+    get_impl()->wallet_set_transaction_imessage_soft_max_length(soft_length);
+    if( call_id != 0 )
+      glog->log_call_finished( call_id, this, "wallet_set_transaction_imessage_soft_max_length", args, fc::variant(result) );
+
+    return;
+  }
+  FC_RETHROW_EXCEPTIONS(warn, "")
+}
+
+int64_t CommonApiClient::wallet_get_transaction_imessage_soft_max_length()
+{
+  ilog("received RPC call: wallet_get_transaction_imessage_soft_max_length()", );
+  goopal::api::GlobalApiLogger* glog = goopal::api::GlobalApiLogger::get_instance();
+  uint64_t call_id = 0;
+  fc::variants args;
+  if( glog != NULL )
+  {
+    call_id = glog->log_call_started( this, "wallet_get_transaction_imessage_soft_max_length", args );
+  }
+
+  struct scope_exit
+  {
+    fc::time_point start_time;
+    scope_exit() : start_time(fc::time_point::now()) {}
+    ~scope_exit() { dlog("RPC call wallet_get_transaction_imessage_soft_max_length finished in ${time} ms", ("time", (fc::time_point::now() - start_time).count() / 1000)); }
+  } execution_time_logger;
+  try
+  {
+    int64_t result = get_impl()->wallet_get_transaction_imessage_soft_max_length();
+    if( call_id != 0 )
+      glog->log_call_finished( call_id, this, "wallet_get_transaction_imessage_soft_max_length", args, fc::variant(result) );
+
+    return result;
+  }
+  FC_RETHROW_EXCEPTIONS(warn, "")
+}
+
+goopal::blockchain::Asset CommonApiClient::wallet_set_transaction_fee(const std::string& fee)
 {
   ilog("received RPC call: wallet_set_transaction_fee(${fee})", ("fee", fee));
   goopal::api::GlobalApiLogger* glog = goopal::api::GlobalApiLogger::get_instance();
@@ -4071,6 +4420,103 @@ bool CommonApiClient::wallet_account_delete(const std::string& account_name)
     bool result = get_impl()->wallet_account_delete(account_name);
     if( call_id != 0 )
       glog->log_call_finished( call_id, this, "wallet_account_delete", args, fc::variant(result) );
+
+    return result;
+  }
+  FC_RETHROW_EXCEPTIONS(warn, "")
+}
+
+std::string CommonApiClient::wallet_transfer_to_address_rpc(const std::string& amount_to_transfer, const std::string& asset_symbol, const std::string& from_account_name, const std::string& to_address, const goopal::blockchain::Imessage& memo_message /* = fc::json::from_string("\"\"").as<goopal::blockchain::Imessage>() */, const goopal::wallet::VoteStrategy& strategy /* = fc::json::from_string("\"vote_recommended\"").as<goopal::wallet::VoteStrategy>() */)
+{
+  ilog("received RPC call: wallet_transfer_to_address_rpc(${amount_to_transfer}, ${asset_symbol}, ${from_account_name}, ${to_address}, ${memo_message}, ${strategy})", ("amount_to_transfer", amount_to_transfer)("asset_symbol", asset_symbol)("from_account_name", from_account_name)("to_address", to_address)("memo_message", memo_message)("strategy", strategy));
+  goopal::api::GlobalApiLogger* glog = goopal::api::GlobalApiLogger::get_instance();
+  uint64_t call_id = 0;
+  fc::variants args;
+  if( glog != NULL )
+  {
+    args.push_back( fc::variant(amount_to_transfer) );
+    args.push_back( fc::variant(asset_symbol) );
+    args.push_back( fc::variant(from_account_name) );
+    args.push_back( fc::variant(to_address) );
+    args.push_back( fc::variant(memo_message) );
+    args.push_back( fc::variant(strategy) );
+    call_id = glog->log_call_started( this, "wallet_transfer_to_address_rpc", args );
+  }
+
+  struct scope_exit
+  {
+    fc::time_point start_time;
+    scope_exit() : start_time(fc::time_point::now()) {}
+    ~scope_exit() { dlog("RPC call wallet_transfer_to_address_rpc finished in ${time} ms", ("time", (fc::time_point::now() - start_time).count() / 1000)); }
+  } execution_time_logger;
+  try
+  {
+    std::string result = get_impl()->wallet_transfer_to_address_rpc(amount_to_transfer, asset_symbol, from_account_name, to_address, memo_message, strategy);
+    if( call_id != 0 )
+      glog->log_call_finished( call_id, this, "wallet_transfer_to_address_rpc", args, fc::variant(result) );
+
+    return result;
+  }
+  FC_RETHROW_EXCEPTIONS(warn, "")
+}
+
+std::string CommonApiClient::wallet_account_balance_rpc(const std::string& account_name /* = fc::json::from_string("\"\"").as<std::string>() */) const
+{
+  ilog("received RPC call: wallet_account_balance_rpc(${account_name})", ("account_name", account_name));
+  goopal::api::GlobalApiLogger* glog = goopal::api::GlobalApiLogger::get_instance();
+  uint64_t call_id = 0;
+  fc::variants args;
+  if( glog != NULL )
+  {
+    args.push_back( fc::variant(account_name) );
+    call_id = glog->log_call_started( this, "wallet_account_balance_rpc", args );
+  }
+
+  struct scope_exit
+  {
+    fc::time_point start_time;
+    scope_exit() : start_time(fc::time_point::now()) {}
+    ~scope_exit() { dlog("RPC call wallet_account_balance_rpc finished in ${time} ms", ("time", (fc::time_point::now() - start_time).count() / 1000)); }
+  } execution_time_logger;
+  try
+  {
+    std::string result = get_impl()->wallet_account_balance_rpc(account_name);
+    if( call_id != 0 )
+      glog->log_call_finished( call_id, this, "wallet_account_balance_rpc", args, fc::variant(result) );
+
+    return result;
+  }
+  FC_RETHROW_EXCEPTIONS(warn, "")
+}
+
+std::string CommonApiClient::wallet_transfer_to_public_account_rpc(const std::string& amount_to_transfer, const std::string& asset_symbol, const std::string& from_account_name, const std::string& to_account_name, const goopal::blockchain::Imessage& memo_message /* = fc::json::from_string("\"\"").as<goopal::blockchain::Imessage>() */, const goopal::wallet::VoteStrategy& strategy /* = fc::json::from_string("\"vote_recommended\"").as<goopal::wallet::VoteStrategy>() */)
+{
+  ilog("received RPC call: wallet_transfer_to_public_account_rpc(${amount_to_transfer}, ${asset_symbol}, ${from_account_name}, ${to_account_name}, ${memo_message}, ${strategy})", ("amount_to_transfer", amount_to_transfer)("asset_symbol", asset_symbol)("from_account_name", from_account_name)("to_account_name", to_account_name)("memo_message", memo_message)("strategy", strategy));
+  goopal::api::GlobalApiLogger* glog = goopal::api::GlobalApiLogger::get_instance();
+  uint64_t call_id = 0;
+  fc::variants args;
+  if( glog != NULL )
+  {
+    args.push_back( fc::variant(amount_to_transfer) );
+    args.push_back( fc::variant(asset_symbol) );
+    args.push_back( fc::variant(from_account_name) );
+    args.push_back( fc::variant(to_account_name) );
+    args.push_back( fc::variant(memo_message) );
+    args.push_back( fc::variant(strategy) );
+    call_id = glog->log_call_started( this, "wallet_transfer_to_public_account_rpc", args );
+  }
+
+  struct scope_exit
+  {
+    fc::time_point start_time;
+    scope_exit() : start_time(fc::time_point::now()) {}
+    ~scope_exit() { dlog("RPC call wallet_transfer_to_public_account_rpc finished in ${time} ms", ("time", (fc::time_point::now() - start_time).count() / 1000)); }
+  } execution_time_logger;
+  try
+  {
+    std::string result = get_impl()->wallet_transfer_to_public_account_rpc(amount_to_transfer, asset_symbol, from_account_name, to_account_name, memo_message, strategy);
+    if( call_id != 0 )
+      glog->log_call_finished( call_id, this, "wallet_transfer_to_public_account_rpc", args, fc::variant(result) );
 
     return result;
   }

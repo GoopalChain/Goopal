@@ -57,6 +57,7 @@ namespace goopal { namespace blockchain {
    FC_DECLARE_DERIVED_EXCEPTION( unknown_delegate_slate,            goopal::blockchain::evaluation_error, 32011, "unknown delegate slate" );
    FC_DECLARE_DERIVED_EXCEPTION( too_may_delegates_in_slate,        goopal::blockchain::evaluation_error, 32012, "too many delegates in slate" );
    FC_DECLARE_DERIVED_EXCEPTION( pay_balance_remaining,             goopal::blockchain::evaluation_error, 32013, "pay balance remaining" );
+   FC_DECLARE_DERIVED_EXCEPTION( message_too_long,                  goopal::blockchain::evaluation_error, 32014, "message is to long");
 
    FC_DECLARE_DERIVED_EXCEPTION( not_a_delegate_signature,          goopal::blockchain::evaluation_error, 33002, "not delegates signature" );
 

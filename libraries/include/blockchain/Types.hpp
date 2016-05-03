@@ -15,7 +15,8 @@ namespace fc {
 }
 
 namespace goopal { namespace blockchain {
-
+   typedef std::string                        Imessage;
+   typedef std::string                        FilePath;
    typedef fc::ripemd160                      BlockIdType;
    typedef fc::ripemd160                      TransactionIdType;
    typedef fc::ripemd160                      PublicKeyHashType;
@@ -31,6 +32,8 @@ namespace goopal { namespace blockchain {
    typedef int64_t                            ShareType;
    typedef uint64_t                           SlateIdType;
    typedef uint64_t                           ObjectIdType;
+   typedef int64_t                            ImessageIdType;
+   typedef int64_t                          ImessageLengthIdType;
 
    using std::string;
    using std::function;

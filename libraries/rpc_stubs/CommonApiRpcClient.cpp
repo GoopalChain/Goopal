@@ -78,15 +78,20 @@ std::vector<goopal::blockchain::AssetEntry> CommonApiRpcClient::blockchain_list_
   fc::variant result = get_json_connection()->async_call("blockchain_list_assets", std::vector<fc::variant>{fc::variant(first_symbol), fc::variant(limit)}).wait();
   return result.as<std::vector<goopal::blockchain::AssetEntry>>();
 }
-std::vector<goopal::blockchain::SignedTransaction> CommonApiRpcClient::blockchain_list_pending_transactions() const
+std::vector<std::pair<goopal::blockchain::TransactionIdType, goopal::blockchain::SignedTransaction>> CommonApiRpcClient::blockchain_list_pending_transactions() const
 {
   fc::variant result = get_json_connection()->async_call("blockchain_list_pending_transactions", std::vector<fc::variant>{}).wait();
-  return result.as<std::vector<goopal::blockchain::SignedTransaction>>();
+  return result.as<std::vector<std::pair<goopal::blockchain::TransactionIdType, goopal::blockchain::SignedTransaction>>>();
 }
 std::pair<goopal::blockchain::TransactionIdType, goopal::blockchain::TransactionEntry> CommonApiRpcClient::blockchain_get_transaction(const std::string& transaction_id_prefix, bool exact /* = fc::json::from_string("false").as<bool>() */) const
 {
   fc::variant result = get_json_connection()->async_call("blockchain_get_transaction", std::vector<fc::variant>{fc::variant(transaction_id_prefix), fc::variant(exact)}).wait();
   return result.as<std::pair<goopal::blockchain::TransactionIdType, goopal::blockchain::TransactionEntry>>();
+}
+goopal::wallet::PrettyTransaction CommonApiRpcClient::blockchain_get_pretty_transaction(const std::string& transaction_id_prefix, bool exact /* = fc::json::from_string("false").as<bool>() */) const
+{
+  fc::variant result = get_json_connection()->async_call("blockchain_get_pretty_transaction", std::vector<fc::variant>{fc::variant(transaction_id_prefix), fc::variant(exact)}).wait();
+  return result.as<goopal::wallet::PrettyTransaction>();
 }
 fc::optional<goopal::blockchain::BlockEntry> CommonApiRpcClient::blockchain_get_block(const std::string& block) const
 {
@@ -163,7 +168,7 @@ std::vector<std::string> CommonApiRpcClient::blockchain_list_missing_block_deleg
   fc::variant result = get_json_connection()->async_call("blockchain_list_missing_block_delegates", std::vector<fc::variant>{fc::variant(block_number)}).wait();
   return result.as<std::vector<std::string>>();
 }
-std::string CommonApiRpcClient::blockchain_export_fork_graph(uint32_t start_block /* = fc::json::from_string("1").as<uint32_t>() */, uint32_t end_block /* = fc::json::from_string("-1").as<uint32_t>() */, const std::string& filename /* = fc::json::from_string("\"\"").as<std::string>() */) const
+std::string CommonApiRpcClient::blockchain_export_fork_graph(uint32_t start_block /* = fc::json::from_string("1").as<uint32_t>() */, uint32_t end_block /* = fc::json::from_string("-1").as<uint32_t>() */, const goopal::blockchain::FilePath& filename /* = fc::json::from_string("\"\"").as<goopal::blockchain::FilePath>() */) const
 {
   fc::variant result = get_json_connection()->async_call("blockchain_export_fork_graph", std::vector<fc::variant>{fc::variant(start_block), fc::variant(end_block), fc::variant(filename)}).wait();
   return result.as<std::string>();
@@ -204,6 +209,11 @@ void CommonApiRpcClient::blockchain_broadcast_transaction(const goopal::blockcha
 void CommonApiRpcClient::blockchain_btc_address_convert(const std::string& path) const
 {
   fc::variant result = get_json_connection()->async_call("blockchain_btc_address_convert", std::vector<fc::variant>{fc::variant(path)}).wait();
+}
+std::string CommonApiRpcClient::blockchain_get_transaction_rpc(const std::string& transaction_id_prefix, bool exact /* = fc::json::from_string("false").as<bool>() */) const
+{
+  fc::variant result = get_json_connection()->async_call("blockchain_get_transaction_rpc", std::vector<fc::variant>{fc::variant(transaction_id_prefix), fc::variant(exact)}).wait();
+  return result.as<std::string>();
 }
 void CommonApiRpcClient::network_add_node(const std::string& node, const std::string& command /* = fc::json::from_string("\"add\"").as<std::string>() */)
 {
@@ -258,6 +268,11 @@ fc::variant_object CommonApiRpcClient::network_get_upnp_info() const
   fc::variant result = get_json_connection()->async_call("network_get_upnp_info", std::vector<fc::variant>{}).wait();
   return result.as<fc::variant_object>();
 }
+std::vector<std::string> CommonApiRpcClient::network_get_blocked_ips() const
+{
+  fc::variant result = get_json_connection()->async_call("network_get_blocked_ips", std::vector<fc::variant>{}).wait();
+  return result.as<std::vector<std::string>>();
+}
 std::string CommonApiRpcClient::debug_get_client_name() const
 {
   fc::variant result = get_json_connection()->async_call("debug_get_client_name", std::vector<fc::variant>{}).wait();
@@ -275,6 +290,14 @@ void CommonApiRpcClient::delegate_set_network_min_connection_count(uint32_t coun
 void CommonApiRpcClient::delegate_set_block_max_transaction_count(uint32_t count)
 {
   fc::variant result = get_json_connection()->async_call("delegate_set_block_max_transaction_count", std::vector<fc::variant>{fc::variant(count)}).wait();
+}
+void CommonApiRpcClient::delegate_set_soft_max_imessage_length(int64_t soft_length)
+{
+  fc::variant result = get_json_connection()->async_call("delegate_set_soft_max_imessage_length", std::vector<fc::variant>{fc::variant(soft_length)}).wait();
+}
+void CommonApiRpcClient::delegate_set_imessage_fee_coe(const std::string& fee_coe)
+{
+  fc::variant result = get_json_connection()->async_call("delegate_set_imessage_fee_coe", std::vector<fc::variant>{fc::variant(fee_coe)}).wait();
 }
 void CommonApiRpcClient::delegate_set_block_max_size(uint32_t size)
 {
@@ -372,7 +395,7 @@ void CommonApiRpcClient::wallet_remove_transaction(const std::string& transactio
 {
   fc::variant result = get_json_connection()->async_call("wallet_remove_transaction", std::vector<fc::variant>{fc::variant(transaction_id)}).wait();
 }
-std::map<goopal::blockchain::TransactionIdType, fc::exception> CommonApiRpcClient::wallet_get_pending_transaction_errors(const std::string& filename /* = fc::json::from_string("\"\"").as<std::string>() */) const
+std::map<goopal::blockchain::TransactionIdType, fc::exception> CommonApiRpcClient::wallet_get_pending_transaction_errors(const goopal::blockchain::FilePath& filename /* = fc::json::from_string("\"\"").as<goopal::blockchain::FilePath>() */) const
 {
   fc::variant result = get_json_connection()->async_call("wallet_get_pending_transaction_errors", std::vector<fc::variant>{fc::variant(filename)}).wait();
   return result.as<std::map<goopal::blockchain::TransactionIdType, fc::exception>>();
@@ -404,27 +427,32 @@ std::vector<std::string> CommonApiRpcClient::wallet_list() const
   fc::variant result = get_json_connection()->async_call("wallet_list", std::vector<fc::variant>{}).wait();
   return result.as<std::vector<std::string>>();
 }
-goopal::blockchain::PublicKeyType CommonApiRpcClient::wallet_account_create(const std::string& account_name, const fc::variant& private_data /* = fc::json::from_string("null").as<fc::variant>() */)
+goopal::blockchain::Address CommonApiRpcClient::wallet_account_create(const std::string& account_name, const fc::variant& private_data /* = fc::json::from_string("null").as<fc::variant>() */)
 {
   fc::variant result = get_json_connection()->async_call("wallet_account_create", std::vector<fc::variant>{fc::variant(account_name), fc::variant(private_data)}).wait();
-  return result.as<goopal::blockchain::PublicKeyType>();
+  return result.as<goopal::blockchain::Address>();
 }
 int8_t CommonApiRpcClient::wallet_account_set_approval(const std::string& account_name, int8_t approval /* = fc::json::from_string("1").as<int8_t>() */)
 {
   fc::variant result = get_json_connection()->async_call("wallet_account_set_approval", std::vector<fc::variant>{fc::variant(account_name), fc::variant(approval)}).wait();
   return result.as<int8_t>();
 }
+std::vector<goopal::blockchain::AccountEntry> CommonApiRpcClient::wallet_get_all_approved_accounts(int8_t approval /* = fc::json::from_string("1").as<int8_t>() */)
+{
+  fc::variant result = get_json_connection()->async_call("wallet_get_all_approved_accounts", std::vector<fc::variant>{fc::variant(approval)}).wait();
+  return result.as<std::vector<goopal::blockchain::AccountEntry>>();
+}
 std::string CommonApiRpcClient::wallet_address_create(const std::string& account_name, const std::string& label /* = fc::json::from_string("\"\"").as<std::string>() */, int32_t legacy_network_byte /* = fc::json::from_string("-1").as<int32_t>() */)
 {
   fc::variant result = get_json_connection()->async_call("wallet_address_create", std::vector<fc::variant>{fc::variant(account_name), fc::variant(label), fc::variant(legacy_network_byte)}).wait();
   return result.as<std::string>();
 }
-goopal::wallet::WalletTransactionEntry CommonApiRpcClient::wallet_transfer_to_address(double amount_to_transfer, const std::string& asset_symbol, const std::string& from_account_name, const std::string& to_address, const std::string& memo_message /* = fc::json::from_string("\"\"").as<std::string>() */, const goopal::wallet::VoteStrategy& strategy /* = fc::json::from_string("\"vote_recommended\"").as<goopal::wallet::VoteStrategy>() */)
+goopal::wallet::WalletTransactionEntry CommonApiRpcClient::wallet_transfer_to_address(const std::string& amount_to_transfer, const std::string& asset_symbol, const std::string& from_account_name, const std::string& to_address, const goopal::blockchain::Imessage& memo_message /* = fc::json::from_string("\"\"").as<goopal::blockchain::Imessage>() */, const goopal::wallet::VoteStrategy& strategy /* = fc::json::from_string("\"vote_recommended\"").as<goopal::wallet::VoteStrategy>() */)
 {
   fc::variant result = get_json_connection()->async_call("wallet_transfer_to_address", std::vector<fc::variant>{fc::variant(amount_to_transfer), fc::variant(asset_symbol), fc::variant(from_account_name), fc::variant(to_address), fc::variant(memo_message), fc::variant(strategy)}).wait();
   return result.as<goopal::wallet::WalletTransactionEntry>();
 }
-goopal::wallet::WalletTransactionEntry CommonApiRpcClient::wallet_transfer_to_public_account(double amount_to_transfer, const std::string& asset_symbol, const std::string& from_account_name, const std::string& to_account_name, const std::string& memo_message /* = fc::json::from_string("\"\"").as<std::string>() */, const goopal::wallet::VoteStrategy& strategy /* = fc::json::from_string("\"vote_recommended\"").as<goopal::wallet::VoteStrategy>() */)
+goopal::wallet::WalletTransactionEntry CommonApiRpcClient::wallet_transfer_to_public_account(const std::string& amount_to_transfer, const std::string& asset_symbol, const std::string& from_account_name, const std::string& to_account_name, const goopal::blockchain::Imessage& memo_message /* = fc::json::from_string("\"\"").as<goopal::blockchain::Imessage>() */, const goopal::wallet::VoteStrategy& strategy /* = fc::json::from_string("\"vote_recommended\"").as<goopal::wallet::VoteStrategy>() */)
 {
   fc::variant result = get_json_connection()->async_call("wallet_transfer_to_public_account", std::vector<fc::variant>{fc::variant(amount_to_transfer), fc::variant(asset_symbol), fc::variant(from_account_name), fc::variant(to_account_name), fc::variant(memo_message), fc::variant(strategy)}).wait();
   return result.as<goopal::wallet::WalletTransactionEntry>();
@@ -490,6 +518,11 @@ std::vector<goopal::wallet::WalletAccountEntry> CommonApiRpcClient::wallet_list_
   fc::variant result = get_json_connection()->async_call("wallet_list_my_accounts", std::vector<fc::variant>{}).wait();
   return result.as<std::vector<goopal::wallet::WalletAccountEntry>>();
 }
+std::vector<goopal::wallet::AccountAddressData> CommonApiRpcClient::wallet_list_my_addresses() const
+{
+  fc::variant result = get_json_connection()->async_call("wallet_list_my_addresses", std::vector<fc::variant>{}).wait();
+  return result.as<std::vector<goopal::wallet::AccountAddressData>>();
+}
 goopal::wallet::WalletAccountEntry CommonApiRpcClient::wallet_get_account(const std::string& account_name) const
 {
   fc::variant result = get_json_connection()->async_call("wallet_get_account", std::vector<fc::variant>{fc::variant(account_name)}).wait();
@@ -508,12 +541,12 @@ void CommonApiRpcClient::wallet_account_rename(const std::string& current_accoun
 {
   fc::variant result = get_json_connection()->async_call("wallet_account_rename", std::vector<fc::variant>{fc::variant(current_account_name), fc::variant(new_account_name)}).wait();
 }
-goopal::wallet::WalletTransactionEntry CommonApiRpcClient::wallet_asset_create(const std::string& symbol, const std::string& asset_name, const std::string& issuer_name, const std::string& description, double maximum_share_supply, uint64_t precision, const fc::variant& public_data /* = fc::json::from_string("null").as<fc::variant>() */, bool is_market_issued /* = fc::json::from_string("false").as<bool>() */)
+goopal::wallet::WalletTransactionEntry CommonApiRpcClient::wallet_asset_create(const std::string& symbol, const std::string& asset_name, const std::string& issuer_name, const std::string& description, const std::string& maximum_share_supply, uint64_t precision, const fc::variant& public_data /* = fc::json::from_string("null").as<fc::variant>() */, bool is_market_issued /* = fc::json::from_string("false").as<bool>() */)
 {
   fc::variant result = get_json_connection()->async_call("wallet_asset_create", std::vector<fc::variant>{fc::variant(symbol), fc::variant(asset_name), fc::variant(issuer_name), fc::variant(description), fc::variant(maximum_share_supply), fc::variant(precision), fc::variant(public_data), fc::variant(is_market_issued)}).wait();
   return result.as<goopal::wallet::WalletTransactionEntry>();
 }
-goopal::wallet::WalletTransactionEntry CommonApiRpcClient::wallet_asset_issue(double amount, const std::string& symbol, const std::string& to_account_name, const std::string& memo_message /* = fc::json::from_string("\"\"").as<std::string>() */)
+goopal::wallet::WalletTransactionEntry CommonApiRpcClient::wallet_asset_issue(const std::string& amount, const std::string& symbol, const std::string& to_account_name, const goopal::blockchain::Imessage& memo_message /* = fc::json::from_string("\"\"").as<goopal::blockchain::Imessage>() */)
 {
   fc::variant result = get_json_connection()->async_call("wallet_asset_issue", std::vector<fc::variant>{fc::variant(amount), fc::variant(symbol), fc::variant(to_account_name), fc::variant(memo_message)}).wait();
   return result.as<goopal::wallet::WalletTransactionEntry>();
@@ -538,22 +571,45 @@ std::vector<goopal::wallet::PublicKeySummary> CommonApiRpcClient::wallet_account
   fc::variant result = get_json_connection()->async_call("wallet_account_list_public_keys", std::vector<fc::variant>{fc::variant(account_name)}).wait();
   return result.as<std::vector<goopal::wallet::PublicKeySummary>>();
 }
-goopal::wallet::WalletTransactionEntry CommonApiRpcClient::wallet_delegate_withdraw_pay(const std::string& delegate_name, const std::string& to_account_name, double amount_to_withdraw)
+goopal::wallet::WalletTransactionEntry CommonApiRpcClient::wallet_delegate_withdraw_pay(const std::string& delegate_name, const std::string& to_account_name, const std::string& amount_to_withdraw)
 {
   fc::variant result = get_json_connection()->async_call("wallet_delegate_withdraw_pay", std::vector<fc::variant>{fc::variant(delegate_name), fc::variant(to_account_name), fc::variant(amount_to_withdraw)}).wait();
   return result.as<goopal::wallet::WalletTransactionEntry>();
 }
-int64_t CommonApiRpcClient::wallet_delegate_pay_balance_query(const std::string& delegate_name)
+goopal::blockchain::DelegatePaySalary CommonApiRpcClient::wallet_delegate_pay_balance_query(const std::string& delegate_name)
 {
   fc::variant result = get_json_connection()->async_call("wallet_delegate_pay_balance_query", std::vector<fc::variant>{fc::variant(delegate_name)}).wait();
-  return result.as<int64_t>();
+  return result.as<goopal::blockchain::DelegatePaySalary>();
+}
+std::map<std::string,goopal::blockchain::DelegatePaySalary> CommonApiRpcClient::wallet_active_delegate_salary()
+{
+  fc::variant result = get_json_connection()->async_call("wallet_active_delegate_salary", std::vector<fc::variant>{}).wait();
+  return result.as<std::map<std::string,goopal::blockchain::DelegatePaySalary>>();
 }
 bool CommonApiRpcClient::wallet_get_delegate_statue(const std::string& account_name)
 {
   fc::variant result = get_json_connection()->async_call("wallet_get_delegate_statue", std::vector<fc::variant>{fc::variant(account_name)}).wait();
   return result.as<bool>();
 }
-goopal::blockchain::Asset CommonApiRpcClient::wallet_set_transaction_fee(double fee)
+void CommonApiRpcClient::wallet_set_transaction_imessage_fee_coe(const std::string& fee_coe)
+{
+  fc::variant result = get_json_connection()->async_call("wallet_set_transaction_imessage_fee_coe", std::vector<fc::variant>{fc::variant(fee_coe)}).wait();
+}
+double CommonApiRpcClient::wallet_get_transaction_imessage_fee_coe()
+{
+  fc::variant result = get_json_connection()->async_call("wallet_get_transaction_imessage_fee_coe", std::vector<fc::variant>{}).wait();
+  return result.as<double>();
+}
+void CommonApiRpcClient::wallet_set_transaction_imessage_soft_max_length(int64_t soft_length)
+{
+  fc::variant result = get_json_connection()->async_call("wallet_set_transaction_imessage_soft_max_length", std::vector<fc::variant>{fc::variant(soft_length)}).wait();
+}
+int64_t CommonApiRpcClient::wallet_get_transaction_imessage_soft_max_length()
+{
+  fc::variant result = get_json_connection()->async_call("wallet_get_transaction_imessage_soft_max_length", std::vector<fc::variant>{}).wait();
+  return result.as<int64_t>();
+}
+goopal::blockchain::Asset CommonApiRpcClient::wallet_set_transaction_fee(const std::string& fee)
 {
   fc::variant result = get_json_connection()->async_call("wallet_set_transaction_fee", std::vector<fc::variant>{fc::variant(fee)}).wait();
   return result.as<goopal::blockchain::Asset>();
@@ -664,6 +720,21 @@ bool CommonApiRpcClient::wallet_account_delete(const std::string& account_name)
 {
   fc::variant result = get_json_connection()->async_call("wallet_account_delete", std::vector<fc::variant>{fc::variant(account_name)}).wait();
   return result.as<bool>();
+}
+std::string CommonApiRpcClient::wallet_transfer_to_address_rpc(const std::string& amount_to_transfer, const std::string& asset_symbol, const std::string& from_account_name, const std::string& to_address, const goopal::blockchain::Imessage& memo_message /* = fc::json::from_string("\"\"").as<goopal::blockchain::Imessage>() */, const goopal::wallet::VoteStrategy& strategy /* = fc::json::from_string("\"vote_recommended\"").as<goopal::wallet::VoteStrategy>() */)
+{
+  fc::variant result = get_json_connection()->async_call("wallet_transfer_to_address_rpc", std::vector<fc::variant>{fc::variant(amount_to_transfer), fc::variant(asset_symbol), fc::variant(from_account_name), fc::variant(to_address), fc::variant(memo_message), fc::variant(strategy)}).wait();
+  return result.as<std::string>();
+}
+std::string CommonApiRpcClient::wallet_account_balance_rpc(const std::string& account_name /* = fc::json::from_string("\"\"").as<std::string>() */) const
+{
+  fc::variant result = get_json_connection()->async_call("wallet_account_balance_rpc", std::vector<fc::variant>{fc::variant(account_name)}).wait();
+  return result.as<std::string>();
+}
+std::string CommonApiRpcClient::wallet_transfer_to_public_account_rpc(const std::string& amount_to_transfer, const std::string& asset_symbol, const std::string& from_account_name, const std::string& to_account_name, const goopal::blockchain::Imessage& memo_message /* = fc::json::from_string("\"\"").as<goopal::blockchain::Imessage>() */, const goopal::wallet::VoteStrategy& strategy /* = fc::json::from_string("\"vote_recommended\"").as<goopal::wallet::VoteStrategy>() */)
+{
+  fc::variant result = get_json_connection()->async_call("wallet_transfer_to_public_account_rpc", std::vector<fc::variant>{fc::variant(amount_to_transfer), fc::variant(asset_symbol), fc::variant(from_account_name), fc::variant(to_account_name), fc::variant(memo_message), fc::variant(strategy)}).wait();
+  return result.as<std::string>();
 }
 fc::variant_object CommonApiRpcClient::about() const
 {

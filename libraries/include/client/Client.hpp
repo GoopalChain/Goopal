@@ -164,7 +164,7 @@ namespace goopal { namespace client {
          void accept_incoming_p2p_connections(bool accept);
          void listen_to_p2p_network();
          static fc::ip::endpoint string_to_endpoint(const std::string& remote_endpoint);
-         void add_node( const string& remote_endpoint );
+         void add_node(const string& remote_endpoint, int32_t oper_flag = 1);
          void connect_to_peer( const string& remote_endpoint );
          void connect_to_p2p_network();
 

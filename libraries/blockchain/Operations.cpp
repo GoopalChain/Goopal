@@ -4,7 +4,7 @@
 #include <blockchain/OperationFactory.hpp>
 #include <blockchain/Operations.hpp>
 #include <blockchain/SlateOperations.hpp>
-
+#include <blockchain/ImessageOperations.hpp>
 #include <fc/io/raw_variant.hpp>
 #include <fc/reflect/variant.hpp>
 
@@ -22,6 +22,7 @@ namespace goopal { namespace blockchain {
    const OperationTypeEnum UpdateSigningKeyOperation::type     = update_signing_key_op_type;
    const OperationTypeEnum UpdateBalanceVoteOperation::type    = update_balance_vote_op_type;
    const OperationTypeEnum UpdateAssetExtOperation::type       = update_asset_ext_op_type;
+   const OperationTypeEnum ImessageMemoOperation::type = imessage_memo_op_type;
 
    static bool first_chain = []()->bool{
       goopal::blockchain::OperationFactory::instance().register_operation<WithdrawOperation>();
@@ -37,6 +38,7 @@ namespace goopal { namespace blockchain {
       goopal::blockchain::OperationFactory::instance().register_operation<UpdateSigningKeyOperation>();
       goopal::blockchain::OperationFactory::instance().register_operation<UpdateBalanceVoteOperation>();
       goopal::blockchain::OperationFactory::instance().register_operation<UpdateAssetExtOperation>();
+      goopal::blockchain::OperationFactory::instance().register_operation<ImessageMemoOperation>();
 
       return true;
    }();

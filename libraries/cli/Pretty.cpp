@@ -1,5 +1,6 @@
 #include <blockchain/Time.hpp>
 #include <cli/Pretty.hpp>
+#include <cli/locale.hpp>
 
 #include <boost/algorithm/string.hpp>
 
@@ -530,7 +531,12 @@ string pretty_transaction_list_history(const vector<PrettyTransaction>& transact
 			}
 		}
 		//out << std::setw(44) << pretty_shorten(_citer->memo, 43);
-		out << _citer->memo;
+#ifdef WIN32
+        string out_memo = UTF8ToGBK(_citer->memo);
+#else
+        string out_memo = _citer->memo;
+#endif
+        out << out_memo;
 // 		out << std::setw(8);
 // 		string str;
 // 		if (transaction.is_virtual)

@@ -51,5 +51,8 @@ namespace goopal { namespace wallet {
 FC_DECLARE_DERIVED_EXCEPTION( invalid_contact,              goopal::wallet::wallet_exception, 20044, "invalid contact" );
 FC_DECLARE_DERIVED_EXCEPTION( label_already_in_use,         goopal::wallet::wallet_exception, 20045, "label already in use" );
 FC_DECLARE_DERIVED_EXCEPTION(invalid_delegate_pay_rate, goopal::wallet::wallet_exception, 20046, "invalid_delegate_pay_rate");
+FC_DECLARE_DERIVED_EXCEPTION(invalid_transaction_imessage_fee_coe, goopal::wallet::wallet_exception, 20047, "invalid_transaction_fee_coe");
+FC_DECLARE_DERIVED_EXCEPTION(invalid_transaction_imessage_soft_length, goopal::wallet::wallet_exception, 20048, "invalid_transaction_soft_max length");
+FC_DECLARE_DERIVED_EXCEPTION(imessage_size_bigger_than_soft_max_lenth, goopal::wallet::wallet_exception, 20049, "imessage size bigger than soft_max_lenth");
 
 } } // goopal::wallet

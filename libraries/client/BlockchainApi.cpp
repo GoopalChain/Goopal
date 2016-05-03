@@ -70,8 +70,13 @@ vector<string> ClientImpl::blockchain_list_missing_block_delegates( uint32_t blo
 }
 vector<GopTrxidBalance> ClientImpl::blockchain_get_gop_account_balance_entry(const uint32_t block_num)
 {
+	
+	uint32_t last_scan_num = _wallet->get_last_scanned_block_number_for_gop();
+	//return _chain_db->fetch_gop_full_entry(block_num, last_scan_num);
+	auto results = _chain_db->fetch_gop_full_entry(block_num, last_scan_num);
 	_wallet->start_scan(block_num, -1);
-	return _chain_db->fetch_gop_full_entry(block_num);
+	return results;
+
 }
 vector<BlockEntry> ClientImpl::blockchain_list_blocks( const uint32_t max_block_num, const uint32_t limit )
 { try {
@@ -105,14 +110,14 @@ vector<BlockEntry> ClientImpl::blockchain_list_blocks( const uint32_t max_block_
     return entrys;
 } FC_CAPTURE_AND_RETHROW( (max_block_num)(limit) ) }
 
-signed_transactions ClientImpl::blockchain_list_pending_transactions() const
+std::vector<std::pair<goopal::blockchain::TransactionIdType, goopal::blockchain::SignedTransaction>>  ClientImpl::blockchain_list_pending_transactions() const
 {
-   signed_transactions trxs;
+    std::vector<std::pair<goopal::blockchain::TransactionIdType, goopal::blockchain::SignedTransaction>> trxs;
    vector<TransactionEvaluationStatePtr> pending = _chain_db->get_pending_transactions();
    trxs.reserve(pending.size());
    for (const auto& trx_eval_ptr : pending)
    {
-      trxs.push_back(trx_eval_ptr->trx);
+       trxs.push_back(std::make_pair(trx_eval_ptr->trx.id(),trx_eval_ptr->trx));
    }
    return trxs;
 }
@@ -170,7 +175,8 @@ map<AccountIdType, string> detail::ClientImpl::blockchain_get_slate( const strin
     }
     else
     {
-        slate_id = std::stoi( slate );
+        auto slate_str = fc::variant(slate);
+        slate_id = slate_str.as<SlateIdType>();
     }
 
     const oSlateEntry slate_entry = _chain_db->get_slate_entry( slate_id );
@@ -225,6 +231,18 @@ pair<TransactionIdType, TransactionEntry> detail::ClientImpl::blockchain_get_tra
    FC_ASSERT( entry.valid(), "Transaction not found!" );
    return std::make_pair( entry->trx.id(), *entry );
 } FC_CAPTURE_AND_RETHROW( (transaction_id_prefix)(exact) ) }
+
+
+PrettyTransaction detail::ClientImpl::blockchain_get_pretty_transaction(const string& transaction_id_prefix,
+	bool exact)const
+{
+	try {
+		const auto id_prefix = variant(transaction_id_prefix).as<TransactionIdType>();
+		const oTransactionEntry entry = _chain_db->get_transaction(id_prefix, exact);
+		FC_ASSERT(entry.valid(), "Transaction not found!");
+		return _wallet->to_pretty_trx(*entry,"");
+	} FC_CAPTURE_AND_RETHROW((transaction_id_prefix)(exact))
+}
 
 
 oBlockEntry detail::ClientImpl::blockchain_get_block( const string& block )const
@@ -518,7 +536,7 @@ map<TransactionIdType, TransactionEntry> ClientImpl::blockchain_get_block_transa
    return transactions_map;
 }
 
-std::string ClientImpl::blockchain_export_fork_graph( uint32_t start_block, uint32_t end_block, const std::string& filename )const
+std::string ClientImpl::blockchain_export_fork_graph(uint32_t start_block, uint32_t end_block, const goopal::blockchain::FilePath& filename)const
 {
    return _chain_db->export_fork_graph( start_block, end_block, filename );
 }
@@ -616,5 +634,27 @@ void ClientImpl::blockchain_broadcast_transaction(const SignedTransaction& trx)
    }
    network_broadcast_transaction(trx);
 }
+
+
+
+std::string detail::ClientImpl::blockchain_get_transaction_rpc(const string& transaction_id_prefix,
+    bool exact)const
+{
+    try
+    {
+        const auto id_prefix = variant(transaction_id_prefix).as<TransactionIdType>();
+        const oTransactionEntry record = _chain_db->get_transaction(id_prefix, exact);
+        FC_ASSERT(record.valid(), "Transaction not found!");
+        std::string result = "{\"result\":\"SUCCESS\",\"message\":\"\"}";
+        return result;
+    }
+    catch (fc::exception er)
+    {
+        std::string result = "{\"result\":\"ERROR\",\"message\":\"" + er.to_string() + "\"}";
+        return result;
+    }
+}
+
+
 
 } } } // namespace goopal::client::detail

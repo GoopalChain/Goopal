@@ -5,8 +5,9 @@
 #include <blockchain/SlateOperations.hpp>
 #include <blockchain/Time.hpp>
 #include <blockchain/Transaction.hpp>
-
+#include <blockchain/ImessageOperations.hpp>
 #include <fc/io/raw_variant.hpp>
+
 
 namespace goopal { namespace blockchain {
 
@@ -279,7 +280,10 @@ namespace goopal { namespace blockchain {
            }
        }
    }
-
+   void Transaction::AddtionImessage(const string imessage)
+   {
+	   operations.emplace_back(ImessageMemoOperation{imessage});
+   }
    bool Transaction::is_cancel()const
    {
       return false;

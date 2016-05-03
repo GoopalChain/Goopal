@@ -80,6 +80,7 @@ int main()
 #include <set>
 
 #include <blockchain/ForkBlocks.hpp>
+#include <cli/locale.hpp>
 
 using namespace boost;
 using std::string;
@@ -122,7 +123,7 @@ program_options::variables_map parse_option_variables(int argc, char** argv)
 				("help", "Display this help message and exit")
 				("version", "Print version information and exit")
 
-				("data-dir", program_options::value<string>(), "Set client data directory")
+				("data-dir", program_options::value<FilePath>(), "Set client data directory")
 				("wallet-dir", program_options::value<string>(), "Set Wallet db directory")
 				("genesis-config", program_options::value<string>(),
 				"Generate a genesis state with the given JSON file instead of using the built-in "
@@ -366,7 +367,12 @@ fc::logging_config create_default_logging_config( const fc::path& data_dir, bool
 				fc::path datadir;
 				if (option_variables.count("data-dir"))
 				{
-					datadir = fc::path(option_variables["data-dir"].as<string>().c_str());
+#ifdef WIN32
+                    datadir = fc::path(option_variables["data-dir"].as<string>());
+#elif
+                    datadir = fc::path(option_variables["data-dir"].as<string>().c_str());
+#endif
+					
 				}
 				else
 				{
@@ -820,11 +826,11 @@ void ClientImpl::delegate_loop()
    {
       try
       {
-         signed_transactions pending = blockchain_list_pending_transactions();
+         auto pending = blockchain_list_pending_transactions();
          wlog( "rebroadcasting ${trx_count}", ("trx_count",pending.size()) );
          for( auto trx : pending )
          {
-            network_broadcast_transaction( trx );
+            network_broadcast_transaction( trx.second );
          }
       }
       catch ( const fc::canceled_exception& )
@@ -1766,7 +1772,7 @@ void Client::configure_from_command_line(int argc, char** argv)
 			}
 
 			start_networking([=]{
-				fc::ip::endpoint actual_p2p_endpoint = this->get_p2p_listening_endpoint();
+ 				fc::ip::endpoint actual_p2p_endpoint = this->get_p2p_listening_endpoint();
 				std::ostringstream port_stream;
 				if (actual_p2p_endpoint.get_address() == fc::ip::address())
 					port_stream << "port " << actual_p2p_endpoint.port();
@@ -1796,10 +1802,18 @@ void Client::configure_from_command_line(int argc, char** argv)
       }
       else if (!option_variables.count("disable-default-peers"))
       {
-         for (string default_peer : my->_config.default_peers)
-						this->add_node(default_peer);
-				}
-			});
+          for (string default_peer : my->_config.default_peers)
+          {
+              try
+              {
+                  this->add_node(default_peer);
+              }
+              catch (net::endpoint_in_blacklist)
+              {
+              }
+          }
+      }
+	  });
 
    if (my->_config.chain_server.enabled)
    {
@@ -1896,7 +1910,7 @@ void Client::set_daemon_mode(bool daemon_mode)
 			}
 		}
 
-		void Client::add_node(const string& remote_endpoint)
+        void Client::add_node(const string& remote_endpoint, int32_t oper_flag)
 		{
 			fc::ip::endpoint endpoint;
 			fc::oexception string_to_endpoint_error;
@@ -1918,7 +1932,7 @@ void Client::set_daemon_mode(bool daemon_mode)
 			try
 			{
 				ulog("Adding peer ${peer} to peer database", ("peer", endpoint));
-				my->_p2p_node->add_node(endpoint);
+				my->_p2p_node->add_node(endpoint, oper_flag);
 			}
 			catch (const goopal::net::already_connected_to_requested_peer&)
 			{

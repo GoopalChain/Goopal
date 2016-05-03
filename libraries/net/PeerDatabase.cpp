@@ -12,6 +12,7 @@
 
 #include <net/PeerDatabase.hpp>
 #include <db/LevelPodMap.hpp>
+#include "db/LevelMap.hpp"
 
 
 
@@ -63,6 +64,7 @@ namespace goopal { namespace net {
       PotentialPeerLeveldb    _leveldb;
 
       PotentialPeerSet     _potential_peer_set;
+     
 
     public:
       void open(const fc::path& databaseFilename);

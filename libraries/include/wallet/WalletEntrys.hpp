@@ -36,7 +36,10 @@ namespace goopal { namespace wallet {
       transaction_scanning,
       last_unlocked_scanned_block_number,
       default_transaction_priority_fee,
-      transaction_expiration_sec
+      transaction_expiration_sec,
+      transaction_min_imessage_soft_length,
+      transaction_min_imessage_fee_coe,
+	  last_scanned_block_number_for_goopal
    };
 
    struct WalletProperty
@@ -68,6 +71,18 @@ namespace goopal { namespace wallet {
        bool                             block_production_enabled = false;
        uint32_t                         last_used_gen_sequence = 0;
        variant                          private_data;
+   };
+
+   struct AccountAddressData :public AccountData
+   {
+       AccountAddressData(){}
+       AccountAddressData(const AccountData & data) :AccountData(data)
+       {
+           owner_address = data.owner_address();
+           active_address = data.active_address();
+       }
+       Address owner_address;
+       Address active_address;
    };
 
    struct KeyData
@@ -273,6 +288,9 @@ FC_REFLECT_ENUM( goopal::wallet::PropertyEnum,
         (last_unlocked_scanned_block_number)
         (default_transaction_priority_fee)
         (transaction_expiration_sec)
+        (transaction_min_imessage_soft_length)
+        (transaction_min_imessage_fee_coe)
+		(last_scanned_block_number_for_goopal)
         )
 
 FC_REFLECT( goopal::wallet::WalletProperty,
@@ -280,13 +298,18 @@ FC_REFLECT( goopal::wallet::WalletProperty,
         (value)
         )
 
-FC_REFLECT_DERIVED( goopal::wallet::AccountData, (goopal::blockchain::AccountEntry),
-        (is_my_account)
-        (approved)
-        (is_favorite)
-        (block_production_enabled)
-        (last_used_gen_sequence)
-        (private_data)
+FC_REFLECT_DERIVED(goopal::wallet::AccountData, (goopal::blockchain::AccountEntry),
+    	(is_my_account)
+    	(approved)
+    	(is_favorite)
+    	(block_production_enabled)
+    	(last_used_gen_sequence)
+    	(private_data)
+    	)
+
+FC_REFLECT_DERIVED(goopal::wallet::AccountAddressData, (goopal::wallet::AccountData),
+        (owner_address)
+        (active_address)
         )
 
 FC_REFLECT( goopal::wallet::MasterKey,

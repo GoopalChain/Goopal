@@ -56,6 +56,8 @@
 
 #include <utilities/GitRevision.hpp>
 #include <fc/git_revision.hpp>
+#include "db/LevelMap.hpp"
+#include "db/FastLevelMap.hpp"
 
 //#define ENABLE_DEBUG_ULOGS
 
@@ -385,6 +387,7 @@ namespace goopal { namespace net { namespace detail {
 
 #define NODE_CONFIGURATION_FILENAME      "node_config.json"
 #define POTENTIAL_PEER_DATABASE_FILENAME "peers.leveldb"
+#define BLACKLIST_DATABASE_FILENAME      "blacklist.leveldb"
       fc::path             _node_configuration_directory;
       NodeConfiguration   _node_configuration;
 
@@ -404,6 +407,8 @@ namespace goopal { namespace net { namespace detail {
       std::list<PotentialPeerEntry> _add_once_node_list; /// list of peers we want to connect to as soon as possible
 
       PeerDatabase             _potential_peer_db;
+      goopal::db::LevelMap<std::string, fc::ip::endpoint> _black_list_db;
+      std::set<std::string>     _blocked_ips;
       fc::promise<void>::ptr    _retrigger_connect_loop_promise;
       bool                      _potential_peer_database_updated;
       fc::future<void>          _p2p_network_connect_loop_done;
@@ -548,10 +553,9 @@ namespace goopal { namespace net { namespace detail {
       virtual ~NodeImpl();
 
       void save_node_configuration();
-
       void p2p_network_connect_loop();
       void trigger_p2p_network_connect_loop();
-
+      void block_node(std::string node,bool block);
       bool have_already_received_sync_item( const ItemHashType& item_hash );
       void request_sync_item_from_peer( const PeerConnectionPtr& peer, const ItemHashType& item_to_request );
       void request_sync_items_from_peer( const PeerConnectionPtr& peer, const std::vector<ItemHashType>& items_to_request );
@@ -688,7 +692,9 @@ namespace goopal { namespace net { namespace detail {
       void load_configuration( const fc::path& configuration_directory );
       void listen_to_p2p_network();
       void connect_to_p2p_network();
-      void add_node( const fc::ip::endpoint& ep );
+      void add_node( const fc::ip::endpoint& ep, int32_t oper_flag = 1 );
+      bool is_blocked_ip(const std::string& ip);
+      bool is_blocked_endpoint(const fc::ip::endpoint& ep);
       void initiate_connect_to(const PeerConnectionPtr& peer);
       void connect_to_endpoint(const fc::ip::endpoint& ep);
       void listen_on_endpoint( const fc::ip::endpoint& ep );
@@ -704,6 +710,7 @@ namespace goopal { namespace net { namespace detail {
       void sync_from(const ItemId& current_head_block, const std::vector<uint32_t>& hard_fork_block_numbers);
       bool is_connected() const;
       std::vector<PotentialPeerEntry> get_potential_peers() const;
+      std::vector<std::string> get_blocked_ips() const;
       void set_advanced_node_parameters( const fc::variant_object& params );
 
       fc::variant_object         get_advanced_node_parameters();
@@ -727,7 +734,6 @@ namespace goopal { namespace net { namespace detail {
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
     void NodeImplDeleter::operator()(NodeImpl* impl_to_delete)
     {
 #ifdef P2P_IN_DEDICATED_THREAD
@@ -892,7 +898,7 @@ namespace goopal { namespace net { namespace detail {
             {
               fc::microseconds delay_until_retry = fc::seconds((iter->number_of_failed_connection_attempts + 1) * _peer_connection_retry_timeout);
 
-              if (!is_connection_to_endpoint_in_progress(iter->endpoint) &&
+              if (!is_blocked_endpoint(iter->endpoint) && !is_connection_to_endpoint_in_progress(iter->endpoint) &&
                   ((iter->last_connection_disposition != last_connection_failed &&
                     iter->last_connection_disposition != last_connection_rejected &&
                     iter->last_connection_disposition != last_connection_handshaking_failed) ||
@@ -2078,7 +2084,8 @@ namespace goopal { namespace net { namespace detail {
       bool new_information_received = merge_address_info_with_potential_peer_database(updated_addresses);
       if (new_information_received)
         trigger_p2p_network_connect_loop();
-
+	  if (originating_peer->get_remote_endpoint().valid() && is_blocked_endpoint(*(originating_peer->get_remote_endpoint())))
+		  return;
       if (_handshaking_connections.find(originating_peer->shared_from_this()) != _handshaking_connections.end())
       {
         // if we were handshaking, we need to continue with the next step in handshaking (which is either
@@ -2200,6 +2207,8 @@ namespace goopal { namespace net { namespace detail {
         }
 
         // transition it to our active list
+		if (originating_peer->get_remote_endpoint().valid() && is_blocked_endpoint(*(originating_peer->get_remote_endpoint())))
+			return;
         move_peer_to_active_list(originating_peer->shared_from_this());
         new_peer_just_added(originating_peer->shared_from_this());
       }
@@ -3591,6 +3600,13 @@ namespace goopal { namespace net { namespace detail {
       VERIFY_CORRECT_THREAD();
 
       // First, stop accepting incoming network connections
+      try{ 
+          _black_list_db.close();
+      }
+      catch (const fc::exception& e)
+      {
+          wlog("Exception thrown while closing black list database, ignoring: ${e}", ("e", e));
+      }
       try
       {
         _tcp_server.close();
@@ -3879,6 +3895,16 @@ namespace goopal { namespace net { namespace detail {
           ilog( "accepted inbound connection from ${remote_endpoint}", ("remote_endpoint", new_peer->get_socket().remote_endpoint() ) );
           if (_node_is_shutting_down)
             return;
+
+          //if in blacklist, forbid to connect
+          fc::optional<fc::ip::endpoint> remote_endpoint;
+          remote_endpoint = new_peer->get_remote_endpoint();
+          if (remote_endpoint.valid() && is_blocked_endpoint(*remote_endpoint))
+          {
+	          new_peer->close_connection();
+	          continue;
+          }
+
           new_peer->connection_initiation_time = fc::time_point::now();
           _handshaking_connections.insert( new_peer );
           _rate_limiter.add_tcp_socket( &new_peer->get_socket() );
@@ -3896,6 +3922,23 @@ namespace goopal { namespace net { namespace detail {
         } FC_CAPTURE_AND_RETHROW()
       }
     } // accept_loop()
+
+    bool NodeImpl::is_blocked_ip(const std::string& ip)
+    {
+        std::set<std::string>::iterator iter = this->_blocked_ips.find(ip);
+        if (iter != this->_blocked_ips.end())
+            return true;
+        return false;
+    }
+
+    bool NodeImpl::is_blocked_endpoint(const fc::ip::endpoint& ep)
+    {
+        std::string ip = fc::string(ep.get_address());
+        std::set<std::string>::iterator iter = this->_blocked_ips.find(ip);
+        if (iter != this->_blocked_ips.end())
+            return true;
+        return false;
+    }
 
     void NodeImpl::send_hello_message(const PeerConnectionPtr& peer)
     {
@@ -4107,8 +4150,25 @@ namespace goopal { namespace net { namespace detail {
       }
 
       _node_public_key = _node_configuration.private_key.get_public_key().serialize();
-
+      fc::path blacklist_database_file_name(_node_configuration_directory / BLACKLIST_DATABASE_FILENAME);
+      try
+      {
+          _black_list_db.open(blacklist_database_file_name);
+          goopal::db::LevelMap<std::string, fc::ip::endpoint>::iterator  it = _black_list_db.begin();
+          while (it.valid())
+          {
+              _blocked_ips.insert(it.key());
+              it++;
+          }
+      }
+      catch (fc::exception& except)
+      {
+          elog("unable to open blacklist database ${filename}: ${error}",
+              ("filename", blacklist_database_file_name)("error", except.to_detail_string()));
+          throw;
+      }
       fc::path potential_peer_database_file_name(_node_configuration_directory / POTENTIAL_PEER_DATABASE_FILENAME);
+      
       try
       {
         _potential_peer_db.open(potential_peer_database_file_name);
@@ -4252,19 +4312,76 @@ namespace goopal { namespace net { namespace detail {
       _dump_node_status_task_done = fc::async([=](){ dump_node_status_task(); }, "dump_node_status_task");
     }
 
-    void NodeImpl::add_node(const fc::ip::endpoint& ep)
+    void NodeImpl::add_node(const fc::ip::endpoint& ep, int32_t oper_flag)
     {
       VERIFY_CORRECT_THREAD();
-      // if we're connecting to them, we believe they're not firewalled
-      PotentialPeerEntry updated_peer_entry = _potential_peer_db.lookup_or_create_entry_for_endpoint(ep);
+      if (oper_flag == 1)
+      {
+          if (is_blocked_endpoint(ep))
+          {
+              FC_THROW_EXCEPTION(endpoint_in_blacklist, "add node failed, because endpoint ${endpoint} is in the blacklist",
+                  ("endpoint", ep));
+          }
+	      // if we're connecting to them, we believe they're not firewalled
+	      PotentialPeerEntry updated_peer_entry = _potential_peer_db.lookup_or_create_entry_for_endpoint(ep);
+	
+	      // if we've recently connected to this peer, reset the last_connection_attempt_time to allow
+	      // us to immediately retry this peer
+	      updated_peer_entry.last_connection_attempt_time = std::min<fc::time_point_sec>(updated_peer_entry.last_connection_attempt_time,
+	                                                                                      fc::time_point::now() - fc::seconds(_peer_connection_retry_timeout));
+	      _add_once_node_list.push_back(updated_peer_entry);
+	      _potential_peer_db.update_entry(updated_peer_entry);
+	      trigger_p2p_network_connect_loop();
+      }
+      else if (oper_flag == -1)
+      {
+          if (ep.port() != 0)
+          {
+	          for (const PeerConnectionPtr& active_peer : _active_connections)
+	          {
+	              if (ep == active_peer->get_remote_endpoint())
+	              {
+	                  disconnect_from_peer(active_peer.get(), "Operate for disconnecting");
+                      return;
+	              }
+	          }
+              FC_THROW_EXCEPTION(no_active_endpoint, "disconnect endpoint failed, because endpoint ${endpoint} is not in the active list",
+                  ("endpoint", ep));
+          }
+          else
+          {
+              int disconn_count = 0;
+              std::vector<PeerConnectionPtr> block_connections;
+              std::string ip = fc::string(ep.get_address());
+              for (const PeerConnectionPtr& active_peer : _active_connections)
+              {
+                  PeerConnection* ptr = active_peer.get();
+                  fc::optional<fc::ip::endpoint> remote_endpoint = active_peer->get_remote_endpoint();
+                  if (!remote_endpoint.valid()) continue;
 
-      // if we've recently connected to this peer, reset the last_connection_attempt_time to allow
-      // us to immediately retry this peer
-      updated_peer_entry.last_connection_attempt_time = std::min<fc::time_point_sec>(updated_peer_entry.last_connection_attempt_time,
-                                                                                      fc::time_point::now() - fc::seconds(_peer_connection_retry_timeout));
-      _add_once_node_list.push_back(updated_peer_entry);
-      _potential_peer_db.update_entry(updated_peer_entry);
-      trigger_p2p_network_connect_loop();
+                  std::string active_ip = fc::string(remote_endpoint->get_address());
+                  if (ip == active_ip)
+                  {
+                      ++disconn_count;
+                      block_connections.push_back(active_peer);
+                  }
+              }
+              for (const PeerConnectionPtr& block_peer : block_connections)
+              {
+                  disconnect_from_peer(block_peer.get(), "Operate for disconnecting");
+              }
+
+              if (block_connections.empty())
+              {
+	              FC_THROW_EXCEPTION(no_active_endpoint, "disconnect endpoint failed, because endpoint ${ip} is not in the active list",
+	                  ("ip", ip));
+              }
+              else
+              {
+                  block_connections.clear();
+              }
+          }
+      }
     }
 
     void NodeImpl::initiate_connect_to(const PeerConnectionPtr& new_peer)
@@ -4294,7 +4411,8 @@ namespace goopal { namespace net { namespace detail {
       if (is_connection_to_endpoint_in_progress(remote_endpoint))
         FC_THROW_EXCEPTION(already_connected_to_requested_peer, "already connected to requested endpoint ${endpoint}",
                            ("endpoint", remote_endpoint));
-
+      if (is_blocked_endpoint(remote_endpoint))
+          return;
       dlog("node_impl::connect_to_endpoint(${endpoint})", ("endpoint", remote_endpoint));
       PeerConnectionPtr new_peer(PeerConnection::make_shared(this));
       new_peer->set_remote_endpoint(remote_endpoint);
@@ -4632,6 +4750,16 @@ namespace goopal { namespace net { namespace detail {
       return result;
     }
 
+    std::vector<std::string> NodeImpl::get_blocked_ips() const
+    {
+      VERIFY_CORRECT_THREAD();
+      std::vector<std::string> result;
+      std::set<std::string>::iterator iter = _blocked_ips.begin();
+      for (; iter != _blocked_ips.end(); ++iter)
+        result.push_back(*iter);
+      return result;
+    }
+
     void NodeImpl::set_advanced_node_parameters(const fc::variant_object& params)
     {
       VERIFY_CORRECT_THREAD();
@@ -4778,6 +4906,21 @@ namespace goopal { namespace net { namespace detail {
       return iter != _hard_fork_block_numbers.end() ? *iter : 0;
     }
 
+    void NodeImpl::block_node(std::string node,bool block)
+    {
+        if (block)
+        {
+            _blocked_ips.insert(node);
+            _black_list_db.store(node, fc::ip::endpoint::from_string(node + ":0"));
+        }
+        else
+        {
+            _blocked_ips.erase(node);
+            _black_list_db.remove(node);
+        }
+
+    }
+
   }  // end namespace detail
 
 
@@ -4823,9 +4966,9 @@ namespace goopal { namespace net { namespace detail {
     INVOKE_IN_IMPL(connect_to_p2p_network);
   }
 
-  void Node::add_node( const fc::ip::endpoint& ep )
+  void Node::add_node(const fc::ip::endpoint& ep, int32_t oper_flag)
   {
-    INVOKE_IN_IMPL(add_node, ep);
+    INVOKE_IN_IMPL(add_node, ep, oper_flag);
   }
 
   void Node::connect_to_endpoint( const fc::ip::endpoint& remote_endpoint )
@@ -4881,6 +5024,11 @@ namespace goopal { namespace net { namespace detail {
   std::vector<PotentialPeerEntry> Node::get_potential_peers()const
   {
     INVOKE_IN_IMPL(get_potential_peers);
+  }
+
+  std::vector<std::string> Node::get_blocked_ips()const
+  {
+    INVOKE_IN_IMPL(get_blocked_ips);
   }
 
   void Node::set_advanced_node_parameters( const fc::variant_object& params )
@@ -4944,12 +5092,18 @@ namespace goopal { namespace net { namespace detail {
     INVOKE_IN_IMPL(network_get_usage_stats);
   }
 
+  void Node::block_node(std::string node, bool block)
+  {
+      INVOKE_IN_IMPL(block_node,node,block);
+  }
   void Node::close()
   {
     wlog( ".... WARNING NOT DOING ANYTHING WHEN I SHOULD ......" );
     return;
     my->close();
   }
+
+
 
   struct SimulatedNetwork::node_info
   {

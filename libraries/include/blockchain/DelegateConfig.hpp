@@ -12,7 +12,7 @@
 
 #define GOP_BLOCKCHAIN_AVERAGE_TRX_SIZE 512 // just a random assumption used to calibrate TRX per SEC
 /** defines the maximum block size allowed, 2 MB per hour */
-#define GOP_BLOCKCHAIN_MAX_BLOCK_SIZE (10 * GOP_BLOCKCHAIN_AVERAGE_TRX_SIZE * GOP_BLOCKCHAIN_MAX_PENDING_QUEUE_SIZE )
+#define GOP_BLOCKCHAIN_MAX_BLOCK_SIZE (2 * GOP_BLOCKCHAIN_AVERAGE_TRX_SIZE * GOP_BLOCKCHAIN_MAX_PENDING_QUEUE_SIZE )
 
 namespace goopal { namespace blockchain {
 
@@ -27,7 +27,8 @@ struct DelegateConfig
     uint32_t            transaction_max_size = GOP_BLOCKCHAIN_MAX_BLOCK_SIZE;
     bool                transaction_canonical_signatures_required = false;
     ShareType          transaction_min_fee = GOP_BLOCKCHAIN_PRECISION / 100;
-
+    ImessageLengthIdType transaction_imessage_max_soft_length = GOP_BLOCKCHAIN_MAX_SOFT_MAX_MESSAGE_SIZE;
+    ImessageIdType      transaction_imessage_min_fee_coe = GOP_BLOCKCHAIN_MIN_MESSAGE_FEE_COE;
     set<TransactionIdType>    transaction_blacklist;
     set<OperationTypeEnum>    operation_blacklist;
 
@@ -39,6 +40,9 @@ struct DelegateConfig
         FC_ASSERT( transaction_max_size <= block_max_size );
         FC_ASSERT( transaction_min_fee >= 0 );
         FC_ASSERT( transaction_min_fee <= GOP_BLOCKCHAIN_MAX_SHARES );
+        FC_ASSERT(transaction_imessage_min_fee_coe >= GOP_BLOCKCHAIN_MIN_MESSAGE_FEE_COE);
+        FC_ASSERT(transaction_imessage_max_soft_length >= 0);
+        FC_ASSERT(transaction_imessage_max_soft_length <= GOP_BLOCKCHAIN_MAX_MESSAGE_SIZE);
     } FC_CAPTURE_AND_RETHROW() }
 };
 
@@ -52,6 +56,8 @@ FC_REFLECT( goopal::blockchain::DelegateConfig,
         (transaction_max_size)
         (transaction_canonical_signatures_required)
         (transaction_min_fee)
+        (transaction_imessage_max_soft_length)
+        (transaction_imessage_min_fee_coe)
         (transaction_blacklist)
         (operation_blacklist)
         )

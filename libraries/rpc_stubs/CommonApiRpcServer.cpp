@@ -36,6 +36,7 @@
 #include <fc/network/ip.hpp>
 #include <fc/optional.hpp>
 #include <fc/time.hpp>
+#include <blockchain/AccountEntry.hpp>
 #include <net/Node.hpp>
 #include <stdint.h>
 #include <string>
@@ -321,7 +322,7 @@ fc::variant CommonApiRpcServer::blockchain_list_pending_transactions_positional(
   // this method has no prerequisites
 
 
-  std::vector<goopal::blockchain::SignedTransaction> result = get_client()->blockchain_list_pending_transactions();
+  std::vector<std::pair<goopal::blockchain::TransactionIdType, goopal::blockchain::SignedTransaction>> result = get_client()->blockchain_list_pending_transactions();
   return fc::variant(result);
 }
 
@@ -330,7 +331,7 @@ fc::variant CommonApiRpcServer::blockchain_list_pending_transactions_named(fc::r
   // this method has no prerequisites
 
 
-  std::vector<goopal::blockchain::SignedTransaction> result = get_client()->blockchain_list_pending_transactions();
+  std::vector<std::pair<goopal::blockchain::TransactionIdType, goopal::blockchain::SignedTransaction>> result = get_client()->blockchain_list_pending_transactions();
   return fc::variant(result);
 }
 
@@ -361,6 +362,36 @@ fc::variant CommonApiRpcServer::blockchain_get_transaction_named(fc::rpc::json_c
     parameters["exact"].as<bool>();
 
   std::pair<goopal::blockchain::TransactionIdType, goopal::blockchain::TransactionEntry> result = get_client()->blockchain_get_transaction(transaction_id_prefix, exact);
+  return fc::variant(result);
+}
+
+fc::variant CommonApiRpcServer::blockchain_get_pretty_transaction_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters)
+{
+  // this method has no prerequisites
+
+  if (parameters.size() <= 0)
+    FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 1 (transaction_id_prefix)");
+  std::string transaction_id_prefix = parameters[0].as<std::string>();
+  bool exact = (parameters.size() <= 1) ?
+    (fc::json::from_string("false").as<bool>()) :
+    parameters[1].as<bool>();
+
+  goopal::wallet::PrettyTransaction result = get_client()->blockchain_get_pretty_transaction(transaction_id_prefix, exact);
+  return fc::variant(result);
+}
+
+fc::variant CommonApiRpcServer::blockchain_get_pretty_transaction_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters)
+{
+  // this method has no prerequisites
+
+  if (!parameters.contains("transaction_id_prefix"))
+    FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 'transaction_id_prefix'");
+  std::string transaction_id_prefix = parameters["transaction_id_prefix"].as<std::string>();
+  bool exact = parameters.contains("exact") ? 
+    (fc::json::from_string("false").as<bool>()) :
+    parameters["exact"].as<bool>();
+
+  goopal::wallet::PrettyTransaction result = get_client()->blockchain_get_pretty_transaction(transaction_id_prefix, exact);
   return fc::variant(result);
 }
 
@@ -776,9 +807,9 @@ fc::variant CommonApiRpcServer::blockchain_export_fork_graph_positional(fc::rpc:
   uint32_t end_block = (parameters.size() <= 1) ?
     (fc::json::from_string("-1").as<uint32_t>()) :
     parameters[1].as<uint32_t>();
-  std::string filename = (parameters.size() <= 2) ?
-    (fc::json::from_string("\"\"").as<std::string>()) :
-    parameters[2].as<std::string>();
+  goopal::blockchain::FilePath filename = (parameters.size() <= 2) ?
+    (fc::json::from_string("\"\"").as<goopal::blockchain::FilePath>()) :
+    parameters[2].as<goopal::blockchain::FilePath>();
 
   std::string result = get_client()->blockchain_export_fork_graph(start_block, end_block, filename);
   return fc::variant(result);
@@ -794,9 +825,9 @@ fc::variant CommonApiRpcServer::blockchain_export_fork_graph_named(fc::rpc::json
   uint32_t end_block = parameters.contains("end_block") ? 
     (fc::json::from_string("-1").as<uint32_t>()) :
     parameters["end_block"].as<uint32_t>();
-  std::string filename = parameters.contains("filename") ? 
-    (fc::json::from_string("\"\"").as<std::string>()) :
-    parameters["filename"].as<std::string>();
+  goopal::blockchain::FilePath filename = parameters.contains("filename") ? 
+    (fc::json::from_string("\"\"").as<goopal::blockchain::FilePath>()) :
+    parameters["filename"].as<goopal::blockchain::FilePath>();
 
   std::string result = get_client()->blockchain_export_fork_graph(start_block, end_block, filename);
   return fc::variant(result);
@@ -998,6 +1029,53 @@ fc::variant CommonApiRpcServer::blockchain_btc_address_convert_named(fc::rpc::js
 
   get_client()->blockchain_btc_address_convert(path);
   return fc::variant();
+}
+
+fc::variant CommonApiRpcServer::blockchain_get_transaction_rpc_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters)
+{
+    try{
+        // this method has no prerequisites
+
+        if (parameters.size() <= 0)
+            FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 1 (transaction_id_prefix)");
+        std::string transaction_id_prefix = parameters[0].as<std::string>();
+        bool exact = (parameters.size() <= 1) ?
+            (fc::json::from_string("false").as<bool>()) :
+            parameters[1].as<bool>();
+
+        std::string result = get_client()->blockchain_get_transaction_rpc(transaction_id_prefix, exact);
+        return fc::variant(result);
+    }
+    catch (fc::exception er)
+    {
+        std::string result = "{\"result\":\"ERROR\",\"message\":\"" + er.to_string() + "\"}";
+        return fc::variant(result);
+    }
+  
+}
+
+fc::variant CommonApiRpcServer::blockchain_get_transaction_rpc_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters)
+{
+    try
+    {
+        // this method has no prerequisites
+
+        if (!parameters.contains("transaction_id_prefix"))
+            FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 'transaction_id_prefix'");
+        std::string transaction_id_prefix = parameters["transaction_id_prefix"].as<std::string>();
+        bool exact = parameters.contains("exact") ?
+            (fc::json::from_string("false").as<bool>()) :
+            parameters["exact"].as<bool>();
+
+        std::string result = get_client()->blockchain_get_transaction_rpc(transaction_id_prefix, exact);
+        return fc::variant(result);
+    }
+    catch (fc::exception er)
+    {
+        std::string result = "{\"result\":\"ERROR\",\"message\":\"\"}";
+        return fc::variant(result);
+    }
+  
 }
 
 fc::variant CommonApiRpcServer::network_add_node_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters)
@@ -1286,6 +1364,28 @@ fc::variant CommonApiRpcServer::network_get_upnp_info_named(fc::rpc::json_connec
   return fc::variant(result);
 }
 
+fc::variant CommonApiRpcServer::network_get_blocked_ips_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters)
+{
+  // check all of this method's prerequisites
+  verify_json_connection_is_authenticated(json_connection);
+  // done checking prerequisites
+
+
+  std::vector<std::string> result = get_client()->network_get_blocked_ips();
+  return fc::variant(result);
+}
+
+fc::variant CommonApiRpcServer::network_get_blocked_ips_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters)
+{
+  // check all of this method's prerequisites
+  verify_json_connection_is_authenticated(json_connection);
+  // done checking prerequisites
+
+
+  std::vector<std::string> result = get_client()->network_get_blocked_ips();
+  return fc::variant(result);
+}
+
 fc::variant CommonApiRpcServer::debug_get_client_name_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters)
 {
   // this method has no prerequisites
@@ -1367,6 +1467,54 @@ fc::variant CommonApiRpcServer::delegate_set_block_max_transaction_count_named(f
   uint32_t count = parameters["count"].as<uint32_t>();
 
   get_client()->delegate_set_block_max_transaction_count(count);
+  return fc::variant();
+}
+
+fc::variant CommonApiRpcServer::delegate_set_soft_max_imessage_length_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters)
+{
+  // this method has no prerequisites
+
+  if (parameters.size() <= 0)
+    FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 1 (soft_length)");
+  int64_t soft_length = parameters[0].as<int64_t>();
+
+  get_client()->delegate_set_soft_max_imessage_length(soft_length);
+  return fc::variant();
+}
+
+fc::variant CommonApiRpcServer::delegate_set_soft_max_imessage_length_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters)
+{
+  // this method has no prerequisites
+
+  if (!parameters.contains("soft_length"))
+    FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 'soft_length'");
+  int64_t soft_length = parameters["soft_length"].as<int64_t>();
+
+  get_client()->delegate_set_soft_max_imessage_length(soft_length);
+  return fc::variant();
+}
+
+fc::variant CommonApiRpcServer::delegate_set_imessage_fee_coe_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters)
+{
+  // this method has no prerequisites
+
+  if (parameters.size() <= 0)
+    FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 1 (fee_coe)");
+  std::string fee_coe = parameters[0].as<std::string>();
+
+  get_client()->delegate_set_imessage_fee_coe(fee_coe);
+  return fc::variant();
+}
+
+fc::variant CommonApiRpcServer::delegate_set_imessage_fee_coe_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters)
+{
+  // this method has no prerequisites
+
+  if (!parameters.contains("fee_coe"))
+    FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 'fee_coe'");
+  std::string fee_coe = parameters["fee_coe"].as<std::string>();
+
+  get_client()->delegate_set_imessage_fee_coe(fee_coe);
   return fc::variant();
 }
 
@@ -2045,9 +2193,9 @@ fc::variant CommonApiRpcServer::wallet_get_pending_transaction_errors_positional
   verify_wallet_is_open();
   // done checking prerequisites
 
-  std::string filename = (parameters.size() <= 0) ?
-    (fc::json::from_string("\"\"").as<std::string>()) :
-    parameters[0].as<std::string>();
+  goopal::blockchain::FilePath filename = (parameters.size() <= 0) ?
+    (fc::json::from_string("\"\"").as<goopal::blockchain::FilePath>()) :
+    parameters[0].as<goopal::blockchain::FilePath>();
 
   std::map<goopal::blockchain::TransactionIdType, fc::exception> result = get_client()->wallet_get_pending_transaction_errors(filename);
   return fc::variant(result);
@@ -2060,9 +2208,9 @@ fc::variant CommonApiRpcServer::wallet_get_pending_transaction_errors_named(fc::
   verify_wallet_is_open();
   // done checking prerequisites
 
-  std::string filename = parameters.contains("filename") ? 
-    (fc::json::from_string("\"\"").as<std::string>()) :
-    parameters["filename"].as<std::string>();
+  goopal::blockchain::FilePath filename = parameters.contains("filename") ? 
+    (fc::json::from_string("\"\"").as<goopal::blockchain::FilePath>()) :
+    parameters["filename"].as<goopal::blockchain::FilePath>();
 
   std::map<goopal::blockchain::TransactionIdType, fc::exception> result = get_client()->wallet_get_pending_transaction_errors(filename);
   return fc::variant(result);
@@ -2265,7 +2413,7 @@ fc::variant CommonApiRpcServer::wallet_account_create_positional(fc::rpc::json_c
     (fc::json::from_string("null").as<fc::variant>()) :
     parameters[1].as<fc::variant>();
 
-  goopal::blockchain::PublicKeyType result = get_client()->wallet_account_create(account_name, private_data);
+  goopal::blockchain::Address result = get_client()->wallet_account_create(account_name, private_data);
   return fc::variant(result);
 }
 
@@ -2284,7 +2432,7 @@ fc::variant CommonApiRpcServer::wallet_account_create_named(fc::rpc::json_connec
     (fc::json::from_string("null").as<fc::variant>()) :
     parameters["private_data"].as<fc::variant>();
 
-  goopal::blockchain::PublicKeyType result = get_client()->wallet_account_create(account_name, private_data);
+  goopal::blockchain::Address result = get_client()->wallet_account_create(account_name, private_data);
   return fc::variant(result);
 }
 
@@ -2321,6 +2469,36 @@ fc::variant CommonApiRpcServer::wallet_account_set_approval_named(fc::rpc::json_
     parameters["approval"].as<int8_t>();
 
   int8_t result = get_client()->wallet_account_set_approval(account_name, approval);
+  return fc::variant(result);
+}
+
+fc::variant CommonApiRpcServer::wallet_get_all_approved_accounts_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters)
+{
+  // check all of this method's prerequisites
+  verify_json_connection_is_authenticated(json_connection);
+  verify_wallet_is_open();
+  // done checking prerequisites
+
+  int8_t approval = (parameters.size() <= 0) ?
+    (fc::json::from_string("1").as<int8_t>()) :
+    parameters[0].as<int8_t>();
+
+  std::vector<goopal::blockchain::AccountEntry> result = get_client()->wallet_get_all_approved_accounts(approval);
+  return fc::variant(result);
+}
+
+fc::variant CommonApiRpcServer::wallet_get_all_approved_accounts_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters)
+{
+  // check all of this method's prerequisites
+  verify_json_connection_is_authenticated(json_connection);
+  verify_wallet_is_open();
+  // done checking prerequisites
+
+  int8_t approval = parameters.contains("approval") ? 
+    (fc::json::from_string("1").as<int8_t>()) :
+    parameters["approval"].as<int8_t>();
+
+  std::vector<goopal::blockchain::AccountEntry> result = get_client()->wallet_get_all_approved_accounts(approval);
   return fc::variant(result);
 }
 
@@ -2375,7 +2553,7 @@ fc::variant CommonApiRpcServer::wallet_transfer_to_address_positional(fc::rpc::j
 
   if (parameters.size() <= 0)
     FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 1 (amount_to_transfer)");
-  double amount_to_transfer = parameters[0].as<double>();
+  std::string amount_to_transfer = parameters[0].as<std::string>();
   if (parameters.size() <= 1)
     FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 2 (asset_symbol)");
   std::string asset_symbol = parameters[1].as<std::string>();
@@ -2385,9 +2563,9 @@ fc::variant CommonApiRpcServer::wallet_transfer_to_address_positional(fc::rpc::j
   if (parameters.size() <= 3)
     FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 4 (to_address)");
   std::string to_address = parameters[3].as<std::string>();
-  std::string memo_message = (parameters.size() <= 4) ?
-    (fc::json::from_string("\"\"").as<std::string>()) :
-    parameters[4].as<std::string>();
+  goopal::blockchain::Imessage memo_message = (parameters.size() <= 4) ?
+    (fc::json::from_string("\"\"").as<goopal::blockchain::Imessage>()) :
+    parameters[4].as<goopal::blockchain::Imessage>();
   goopal::wallet::VoteStrategy strategy = (parameters.size() <= 5) ?
     (fc::json::from_string("\"vote_recommended\"").as<goopal::wallet::VoteStrategy>()) :
     parameters[5].as<goopal::wallet::VoteStrategy>();
@@ -2405,7 +2583,7 @@ fc::variant CommonApiRpcServer::wallet_transfer_to_address_named(fc::rpc::json_c
 
   if (!parameters.contains("amount_to_transfer"))
     FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 'amount_to_transfer'");
-  double amount_to_transfer = parameters["amount_to_transfer"].as<double>();
+  std::string amount_to_transfer = parameters["amount_to_transfer"].as<std::string>();
   if (!parameters.contains("asset_symbol"))
     FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 'asset_symbol'");
   std::string asset_symbol = parameters["asset_symbol"].as<std::string>();
@@ -2415,9 +2593,9 @@ fc::variant CommonApiRpcServer::wallet_transfer_to_address_named(fc::rpc::json_c
   if (!parameters.contains("to_address"))
     FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 'to_address'");
   std::string to_address = parameters["to_address"].as<std::string>();
-  std::string memo_message = parameters.contains("memo_message") ? 
-    (fc::json::from_string("\"\"").as<std::string>()) :
-    parameters["memo_message"].as<std::string>();
+  goopal::blockchain::Imessage memo_message = parameters.contains("memo_message") ? 
+    (fc::json::from_string("\"\"").as<goopal::blockchain::Imessage>()) :
+    parameters["memo_message"].as<goopal::blockchain::Imessage>();
   goopal::wallet::VoteStrategy strategy = parameters.contains("strategy") ? 
     (fc::json::from_string("\"vote_recommended\"").as<goopal::wallet::VoteStrategy>()) :
     parameters["strategy"].as<goopal::wallet::VoteStrategy>();
@@ -2436,7 +2614,7 @@ fc::variant CommonApiRpcServer::wallet_transfer_to_public_account_positional(fc:
 
   if (parameters.size() <= 0)
     FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 1 (amount_to_transfer)");
-  double amount_to_transfer = parameters[0].as<double>();
+  std::string amount_to_transfer = parameters[0].as<std::string>();
   if (parameters.size() <= 1)
     FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 2 (asset_symbol)");
   std::string asset_symbol = parameters[1].as<std::string>();
@@ -2446,9 +2624,9 @@ fc::variant CommonApiRpcServer::wallet_transfer_to_public_account_positional(fc:
   if (parameters.size() <= 3)
     FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 4 (to_account_name)");
   std::string to_account_name = parameters[3].as<std::string>();
-  std::string memo_message = (parameters.size() <= 4) ?
-    (fc::json::from_string("\"\"").as<std::string>()) :
-    parameters[4].as<std::string>();
+  goopal::blockchain::Imessage memo_message = (parameters.size() <= 4) ?
+    (fc::json::from_string("\"\"").as<goopal::blockchain::Imessage>()) :
+    parameters[4].as<goopal::blockchain::Imessage>();
   goopal::wallet::VoteStrategy strategy = (parameters.size() <= 5) ?
     (fc::json::from_string("\"vote_recommended\"").as<goopal::wallet::VoteStrategy>()) :
     parameters[5].as<goopal::wallet::VoteStrategy>();
@@ -2467,7 +2645,7 @@ fc::variant CommonApiRpcServer::wallet_transfer_to_public_account_named(fc::rpc:
 
   if (!parameters.contains("amount_to_transfer"))
     FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 'amount_to_transfer'");
-  double amount_to_transfer = parameters["amount_to_transfer"].as<double>();
+  std::string amount_to_transfer = parameters["amount_to_transfer"].as<std::string>();
   if (!parameters.contains("asset_symbol"))
     FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 'asset_symbol'");
   std::string asset_symbol = parameters["asset_symbol"].as<std::string>();
@@ -2477,9 +2655,9 @@ fc::variant CommonApiRpcServer::wallet_transfer_to_public_account_named(fc::rpc:
   if (!parameters.contains("to_account_name"))
     FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 'to_account_name'");
   std::string to_account_name = parameters["to_account_name"].as<std::string>();
-  std::string memo_message = parameters.contains("memo_message") ? 
-    (fc::json::from_string("\"\"").as<std::string>()) :
-    parameters["memo_message"].as<std::string>();
+  goopal::blockchain::Imessage memo_message = parameters.contains("memo_message") ? 
+    (fc::json::from_string("\"\"").as<goopal::blockchain::Imessage>()) :
+    parameters["memo_message"].as<goopal::blockchain::Imessage>();
   goopal::wallet::VoteStrategy strategy = parameters.contains("strategy") ? 
     (fc::json::from_string("\"vote_recommended\"").as<goopal::wallet::VoteStrategy>()) :
     parameters["strategy"].as<goopal::wallet::VoteStrategy>();
@@ -2974,6 +3152,30 @@ fc::variant CommonApiRpcServer::wallet_list_my_accounts_named(fc::rpc::json_conn
   return fc::variant(result);
 }
 
+fc::variant CommonApiRpcServer::wallet_list_my_addresses_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters)
+{
+  // check all of this method's prerequisites
+  verify_json_connection_is_authenticated(json_connection);
+  verify_wallet_is_open();
+  // done checking prerequisites
+
+
+  std::vector<goopal::wallet::AccountAddressData> result = get_client()->wallet_list_my_addresses();
+  return fc::variant(result);
+}
+
+fc::variant CommonApiRpcServer::wallet_list_my_addresses_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters)
+{
+  // check all of this method's prerequisites
+  verify_json_connection_is_authenticated(json_connection);
+  verify_wallet_is_open();
+  // done checking prerequisites
+
+
+  std::vector<goopal::wallet::AccountAddressData> result = get_client()->wallet_list_my_addresses();
+  return fc::variant(result);
+}
+
 fc::variant CommonApiRpcServer::wallet_get_account_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters)
 {
   // check all of this method's prerequisites
@@ -3122,7 +3324,7 @@ fc::variant CommonApiRpcServer::wallet_asset_create_positional(fc::rpc::json_con
   std::string description = parameters[3].as<std::string>();
   if (parameters.size() <= 4)
     FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 5 (maximum_share_supply)");
-  double maximum_share_supply = parameters[4].as<double>();
+  std::string maximum_share_supply = parameters[4].as<std::string>();
   if (parameters.size() <= 5)
     FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 6 (precision)");
   uint64_t precision = parameters[5].as<uint64_t>();
@@ -3159,7 +3361,7 @@ fc::variant CommonApiRpcServer::wallet_asset_create_named(fc::rpc::json_connecti
   std::string description = parameters["description"].as<std::string>();
   if (!parameters.contains("maximum_share_supply"))
     FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 'maximum_share_supply'");
-  double maximum_share_supply = parameters["maximum_share_supply"].as<double>();
+  std::string maximum_share_supply = parameters["maximum_share_supply"].as<std::string>();
   if (!parameters.contains("precision"))
     FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 'precision'");
   uint64_t precision = parameters["precision"].as<uint64_t>();
@@ -3184,16 +3386,16 @@ fc::variant CommonApiRpcServer::wallet_asset_issue_positional(fc::rpc::json_conn
 
   if (parameters.size() <= 0)
     FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 1 (amount)");
-  double amount = parameters[0].as<double>();
+  std::string amount = parameters[0].as<std::string>();
   if (parameters.size() <= 1)
     FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 2 (symbol)");
   std::string symbol = parameters[1].as<std::string>();
   if (parameters.size() <= 2)
     FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 3 (to_account_name)");
   std::string to_account_name = parameters[2].as<std::string>();
-  std::string memo_message = (parameters.size() <= 3) ?
-    (fc::json::from_string("\"\"").as<std::string>()) :
-    parameters[3].as<std::string>();
+  goopal::blockchain::Imessage memo_message = (parameters.size() <= 3) ?
+    (fc::json::from_string("\"\"").as<goopal::blockchain::Imessage>()) :
+    parameters[3].as<goopal::blockchain::Imessage>();
 
   goopal::wallet::WalletTransactionEntry result = get_client()->wallet_asset_issue(amount, symbol, to_account_name, memo_message);
   return fc::variant(result);
@@ -3209,16 +3411,16 @@ fc::variant CommonApiRpcServer::wallet_asset_issue_named(fc::rpc::json_connectio
 
   if (!parameters.contains("amount"))
     FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 'amount'");
-  double amount = parameters["amount"].as<double>();
+  std::string amount = parameters["amount"].as<std::string>();
   if (!parameters.contains("symbol"))
     FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 'symbol'");
   std::string symbol = parameters["symbol"].as<std::string>();
   if (!parameters.contains("to_account_name"))
     FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 'to_account_name'");
   std::string to_account_name = parameters["to_account_name"].as<std::string>();
-  std::string memo_message = parameters.contains("memo_message") ? 
-    (fc::json::from_string("\"\"").as<std::string>()) :
-    parameters["memo_message"].as<std::string>();
+  goopal::blockchain::Imessage memo_message = parameters.contains("memo_message") ? 
+    (fc::json::from_string("\"\"").as<goopal::blockchain::Imessage>()) :
+    parameters["memo_message"].as<goopal::blockchain::Imessage>();
 
   goopal::wallet::WalletTransactionEntry result = get_client()->wallet_asset_issue(amount, symbol, to_account_name, memo_message);
   return fc::variant(result);
@@ -3368,7 +3570,7 @@ fc::variant CommonApiRpcServer::wallet_delegate_withdraw_pay_positional(fc::rpc:
   std::string to_account_name = parameters[1].as<std::string>();
   if (parameters.size() <= 2)
     FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 3 (amount_to_withdraw)");
-  double amount_to_withdraw = parameters[2].as<double>();
+  std::string amount_to_withdraw = parameters[2].as<std::string>();
 
   goopal::wallet::WalletTransactionEntry result = get_client()->wallet_delegate_withdraw_pay(delegate_name, to_account_name, amount_to_withdraw);
   return fc::variant(result);
@@ -3390,7 +3592,7 @@ fc::variant CommonApiRpcServer::wallet_delegate_withdraw_pay_named(fc::rpc::json
   std::string to_account_name = parameters["to_account_name"].as<std::string>();
   if (!parameters.contains("amount_to_withdraw"))
     FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 'amount_to_withdraw'");
-  double amount_to_withdraw = parameters["amount_to_withdraw"].as<double>();
+  std::string amount_to_withdraw = parameters["amount_to_withdraw"].as<std::string>();
 
   goopal::wallet::WalletTransactionEntry result = get_client()->wallet_delegate_withdraw_pay(delegate_name, to_account_name, amount_to_withdraw);
   return fc::variant(result);
@@ -3408,7 +3610,7 @@ fc::variant CommonApiRpcServer::wallet_delegate_pay_balance_query_positional(fc:
     FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 1 (delegate_name)");
   std::string delegate_name = parameters[0].as<std::string>();
 
-  int64_t result = get_client()->wallet_delegate_pay_balance_query(delegate_name);
+  goopal::blockchain::DelegatePaySalary result = get_client()->wallet_delegate_pay_balance_query(delegate_name);
   return fc::variant(result);
 }
 
@@ -3424,7 +3626,34 @@ fc::variant CommonApiRpcServer::wallet_delegate_pay_balance_query_named(fc::rpc:
     FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 'delegate_name'");
   std::string delegate_name = parameters["delegate_name"].as<std::string>();
 
-  int64_t result = get_client()->wallet_delegate_pay_balance_query(delegate_name);
+  goopal::blockchain::DelegatePaySalary result = get_client()->wallet_delegate_pay_balance_query(delegate_name);
+  return fc::variant(result);
+}
+
+
+fc::variant CommonApiRpcServer::wallet_active_delegate_salary_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters)
+{
+  // check all of this method's prerequisites
+  verify_json_connection_is_authenticated(json_connection);
+  verify_wallet_is_open();
+  verify_wallet_is_unlocked();
+  // done checking prerequisites
+
+
+  std::map<std::string,goopal::blockchain::DelegatePaySalary> result = get_client()->wallet_active_delegate_salary();
+  return fc::variant(result);
+}
+
+fc::variant CommonApiRpcServer::wallet_active_delegate_salary_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters)
+{
+  // check all of this method's prerequisites
+  verify_json_connection_is_authenticated(json_connection);
+  verify_wallet_is_open();
+  verify_wallet_is_unlocked();
+  // done checking prerequisites
+
+
+  std::map<std::string,goopal::blockchain::DelegatePaySalary> result = get_client()->wallet_active_delegate_salary();
   return fc::variant(result);
 }
 
@@ -3458,6 +3687,114 @@ fc::variant CommonApiRpcServer::wallet_get_delegate_statue_named(fc::rpc::json_c
   return fc::variant(result);
 }
 
+fc::variant CommonApiRpcServer::wallet_set_transaction_imessage_fee_coe_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters)
+{
+  // check all of this method's prerequisites
+  verify_json_connection_is_authenticated(json_connection);
+  verify_wallet_is_open();
+  // done checking prerequisites
+
+  if (parameters.size() <= 0)
+    FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 1 (fee_coe)");
+  std::string fee_coe = parameters[0].as<std::string>();
+
+  get_client()->wallet_set_transaction_imessage_fee_coe(fee_coe);
+  return fc::variant();
+}
+
+fc::variant CommonApiRpcServer::wallet_set_transaction_imessage_fee_coe_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters)
+{
+  // check all of this method's prerequisites
+  verify_json_connection_is_authenticated(json_connection);
+  verify_wallet_is_open();
+  // done checking prerequisites
+
+  if (!parameters.contains("fee_coe"))
+    FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 'fee_coe'");
+  std::string fee_coe = parameters["fee_coe"].as<std::string>();
+
+  get_client()->wallet_set_transaction_imessage_fee_coe(fee_coe);
+  return fc::variant();
+}
+
+fc::variant CommonApiRpcServer::wallet_get_transaction_imessage_fee_coe_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters)
+{
+  // check all of this method's prerequisites
+  verify_json_connection_is_authenticated(json_connection);
+  verify_wallet_is_open();
+  // done checking prerequisites
+
+
+  double result = get_client()->wallet_get_transaction_imessage_fee_coe();
+  return fc::variant(result);
+}
+
+fc::variant CommonApiRpcServer::wallet_get_transaction_imessage_fee_coe_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters)
+{
+  // check all of this method's prerequisites
+  verify_json_connection_is_authenticated(json_connection);
+  verify_wallet_is_open();
+  // done checking prerequisites
+
+
+  double result = get_client()->wallet_get_transaction_imessage_fee_coe();
+  return fc::variant(result);
+}
+
+fc::variant CommonApiRpcServer::wallet_set_transaction_imessage_soft_max_length_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters)
+{
+  // check all of this method's prerequisites
+  verify_json_connection_is_authenticated(json_connection);
+  verify_wallet_is_open();
+  // done checking prerequisites
+
+  if (parameters.size() <= 0)
+    FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 1 (soft_length)");
+  int64_t soft_length = parameters[0].as<int64_t>();
+
+  get_client()->wallet_set_transaction_imessage_soft_max_length(soft_length);
+  return fc::variant();
+}
+
+fc::variant CommonApiRpcServer::wallet_set_transaction_imessage_soft_max_length_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters)
+{
+  // check all of this method's prerequisites
+  verify_json_connection_is_authenticated(json_connection);
+  verify_wallet_is_open();
+  // done checking prerequisites
+
+  if (!parameters.contains("soft_length"))
+    FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 'soft_length'");
+  int64_t soft_length = parameters["soft_length"].as<int64_t>();
+
+  get_client()->wallet_set_transaction_imessage_soft_max_length(soft_length);
+  return fc::variant();
+}
+
+fc::variant CommonApiRpcServer::wallet_get_transaction_imessage_soft_max_length_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters)
+{
+  // check all of this method's prerequisites
+  verify_json_connection_is_authenticated(json_connection);
+  verify_wallet_is_open();
+  // done checking prerequisites
+
+
+  int64_t result = get_client()->wallet_get_transaction_imessage_soft_max_length();
+  return fc::variant(result);
+}
+
+fc::variant CommonApiRpcServer::wallet_get_transaction_imessage_soft_max_length_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters)
+{
+  // check all of this method's prerequisites
+  verify_json_connection_is_authenticated(json_connection);
+  verify_wallet_is_open();
+  // done checking prerequisites
+
+
+  int64_t result = get_client()->wallet_get_transaction_imessage_soft_max_length();
+  return fc::variant(result);
+}
+
 fc::variant CommonApiRpcServer::wallet_set_transaction_fee_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters)
 {
   // check all of this method's prerequisites
@@ -3467,7 +3804,7 @@ fc::variant CommonApiRpcServer::wallet_set_transaction_fee_positional(fc::rpc::j
 
   if (parameters.size() <= 0)
     FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 1 (fee)");
-  double fee = parameters[0].as<double>();
+  std::string fee = parameters[0].as<std::string>();
 
   goopal::blockchain::Asset result = get_client()->wallet_set_transaction_fee(fee);
   return fc::variant(result);
@@ -3482,7 +3819,7 @@ fc::variant CommonApiRpcServer::wallet_set_transaction_fee_named(fc::rpc::json_c
 
   if (!parameters.contains("fee"))
     FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 'fee'");
-  double fee = parameters["fee"].as<double>();
+  std::string fee = parameters["fee"].as<std::string>();
 
   goopal::blockchain::Asset result = get_client()->wallet_set_transaction_fee(fee);
   return fc::variant(result);
@@ -4266,6 +4603,211 @@ fc::variant CommonApiRpcServer::wallet_account_delete_named(fc::rpc::json_connec
   return fc::variant(result);
 }
 
+fc::variant CommonApiRpcServer::wallet_transfer_to_address_rpc_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters)
+{
+    try{
+
+        // check all of this method's prerequisites
+        verify_json_connection_is_authenticated(json_connection);
+        verify_wallet_is_open();
+        // done checking prerequisites
+
+        if (parameters.size() <= 0)
+            FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 1 (amount_to_transfer)");
+        std::string amount_to_transfer = parameters[0].as<std::string>();
+        if (parameters.size() <= 1)
+            FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 2 (asset_symbol)");
+        std::string asset_symbol = parameters[1].as<std::string>();
+        if (parameters.size() <= 2)
+            FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 3 (from_account_name)");
+        std::string from_account_name = parameters[2].as<std::string>();
+        if (parameters.size() <= 3)
+            FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 4 (to_address)");
+        std::string to_address = parameters[3].as<std::string>();
+        goopal::blockchain::Imessage memo_message = (parameters.size() <= 4) ?
+            (fc::json::from_string("\"\"").as<goopal::blockchain::Imessage>()) :
+            parameters[4].as<goopal::blockchain::Imessage>();
+        goopal::wallet::VoteStrategy strategy = (parameters.size() <= 5) ?
+            (fc::json::from_string("\"vote_recommended\"").as<goopal::wallet::VoteStrategy>()) :
+            parameters[5].as<goopal::wallet::VoteStrategy>();
+
+        std::string result = get_client()->wallet_transfer_to_address_rpc(amount_to_transfer, asset_symbol, from_account_name, to_address, memo_message, strategy);
+        return fc::variant(result);
+    }
+    catch (fc::exception e)
+    {
+        std::string res = "{\"result\":\"ERROR\",\"message\":\"";
+        res += e.to_string();
+        res += "\"}";
+        return res;
+    }
+}
+
+fc::variant CommonApiRpcServer::wallet_transfer_to_address_rpc_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters)
+{
+    try{
+      // check all of this method's prerequisites
+      verify_json_connection_is_authenticated(json_connection);
+      verify_wallet_is_open();
+      // done checking prerequisites
+
+      if (!parameters.contains("amount_to_transfer"))
+        FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 'amount_to_transfer'");
+      std::string amount_to_transfer = parameters["amount_to_transfer"].as<std::string>();
+      if (!parameters.contains("asset_symbol"))
+        FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 'asset_symbol'");
+      std::string asset_symbol = parameters["asset_symbol"].as<std::string>();
+      if (!parameters.contains("from_account_name"))
+        FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 'from_account_name'");
+      std::string from_account_name = parameters["from_account_name"].as<std::string>();
+      if (!parameters.contains("to_address"))
+        FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 'to_address'");
+      std::string to_address = parameters["to_address"].as<std::string>();
+      goopal::blockchain::Imessage memo_message = parameters.contains("memo_message") ? 
+        (fc::json::from_string("\"\"").as<goopal::blockchain::Imessage>()) :
+        parameters["memo_message"].as<goopal::blockchain::Imessage>();
+      goopal::wallet::VoteStrategy strategy = parameters.contains("strategy") ? 
+        (fc::json::from_string("\"vote_recommended\"").as<goopal::wallet::VoteStrategy>()) :
+        parameters["strategy"].as<goopal::wallet::VoteStrategy>();
+
+      std::string result = get_client()->wallet_transfer_to_address_rpc(amount_to_transfer, asset_symbol, from_account_name, to_address, memo_message, strategy);
+      return fc::variant(result);
+    }
+    catch (fc::exception e)
+    {
+        std::string res = "{\"result\":\"ERROR\",\"message\":\"";
+        res += e.to_string();
+        res += "\"}";
+        return res;
+    }
+}
+
+fc::variant CommonApiRpcServer::wallet_account_balance_rpc_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters)
+{
+    try{
+      // check all of this method's prerequisites
+      verify_json_connection_is_authenticated(json_connection);
+      verify_wallet_is_open();
+      // done checking prerequisites
+
+      std::string account_name = (parameters.size() <= 0) ?
+        (fc::json::from_string("\"\"").as<std::string>()) :
+        parameters[0].as<std::string>();
+
+      std::string result = get_client()->wallet_account_balance_rpc(account_name);
+      return fc::variant(result);
+    }
+    catch (fc::exception e)
+    {
+        std::string res = "{\"result\":\"ERROR\",\"message\":\"";
+        res += e.to_string();
+        res += "\"}";
+        return  fc::variant(res);
+    }
+}
+
+fc::variant CommonApiRpcServer::wallet_account_balance_rpc_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters)
+{
+    try{
+      // check all of this method's prerequisites
+      verify_json_connection_is_authenticated(json_connection);
+      verify_wallet_is_open();
+      // done checking prerequisites
+
+      std::string account_name = parameters.contains("account_name") ? 
+        (fc::json::from_string("\"\"").as<std::string>()) :
+        parameters["account_name"].as<std::string>();
+
+      std::string result = get_client()->wallet_account_balance_rpc(account_name);
+      return fc::variant(result);
+    }
+    catch (fc::exception e)
+    {
+        std::string res = "{\"result\":\"ERROR\",\"message\":\"";
+        res += e.to_string();
+        res += "\"}";
+        return  fc::variant(res);
+    }
+}
+
+fc::variant CommonApiRpcServer::wallet_transfer_to_public_account_rpc_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters)
+{
+    try
+    {
+      // check all of this method's prerequisites
+      verify_json_connection_is_authenticated(json_connection);
+      verify_wallet_is_open();
+      verify_wallet_is_unlocked();
+      // done checking prerequisites
+
+      if (parameters.size() <= 0)
+        FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 1 (amount_to_transfer)");
+      std::string amount_to_transfer = parameters[0].as<std::string>();
+      if (parameters.size() <= 1)
+        FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 2 (asset_symbol)");
+      std::string asset_symbol = parameters[1].as<std::string>();
+      if (parameters.size() <= 2)
+        FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 3 (from_account_name)");
+      std::string from_account_name = parameters[2].as<std::string>();
+      if (parameters.size() <= 3)
+        FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 4 (to_account_name)");
+      std::string to_account_name = parameters[3].as<std::string>();
+      goopal::blockchain::Imessage memo_message = (parameters.size() <= 4) ?
+        (fc::json::from_string("\"\"").as<goopal::blockchain::Imessage>()) :
+        parameters[4].as<goopal::blockchain::Imessage>();
+      goopal::wallet::VoteStrategy strategy = (parameters.size() <= 5) ?
+        (fc::json::from_string("\"vote_recommended\"").as<goopal::wallet::VoteStrategy>()) :
+        parameters[5].as<goopal::wallet::VoteStrategy>();
+
+      std::string result = get_client()->wallet_transfer_to_public_account_rpc(amount_to_transfer, asset_symbol, from_account_name, to_account_name, memo_message, strategy);
+      return fc::variant(result);
+    }
+    catch (fc::exception er)
+    {
+        std::string result = "{\"result\":\"ERROR\",\"message\":\"" + er.to_string() + "\"}";
+        return fc::variant(result);
+    }
+}
+
+fc::variant CommonApiRpcServer::wallet_transfer_to_public_account_rpc_named(fc::rpc::json_connection* json_connection, const fc::variant_object& parameters)
+{
+    try
+    {
+      // check all of this method's prerequisites
+      verify_json_connection_is_authenticated(json_connection);
+      verify_wallet_is_open();
+      verify_wallet_is_unlocked();
+      // done checking prerequisites
+
+      if (!parameters.contains("amount_to_transfer"))
+        FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 'amount_to_transfer'");
+      std::string amount_to_transfer = parameters["amount_to_transfer"].as<std::string>();
+      if (!parameters.contains("asset_symbol"))
+        FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 'asset_symbol'");
+      std::string asset_symbol = parameters["asset_symbol"].as<std::string>();
+      if (!parameters.contains("from_account_name"))
+        FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 'from_account_name'");
+      std::string from_account_name = parameters["from_account_name"].as<std::string>();
+      if (!parameters.contains("to_account_name"))
+        FC_THROW_EXCEPTION(fc::invalid_arg_exception, "missing required parameter 'to_account_name'");
+      std::string to_account_name = parameters["to_account_name"].as<std::string>();
+      goopal::blockchain::Imessage memo_message = parameters.contains("memo_message") ? 
+        (fc::json::from_string("\"\"").as<goopal::blockchain::Imessage>()) :
+        parameters["memo_message"].as<goopal::blockchain::Imessage>();
+      goopal::wallet::VoteStrategy strategy = parameters.contains("strategy") ? 
+        (fc::json::from_string("\"vote_recommended\"").as<goopal::wallet::VoteStrategy>()) :
+        parameters["strategy"].as<goopal::wallet::VoteStrategy>();
+
+      std::string result = get_client()->wallet_transfer_to_public_account_rpc(amount_to_transfer, asset_symbol, from_account_name, to_account_name, memo_message, strategy);
+      return fc::variant(result);
+    }
+    catch (fc::exception er)
+    {
+        std::string result = "{\"result\":\"ERROR\",\"message\":\"" + er.to_string() + "\"}";
+        return fc::variant(result);
+    }
+}
+
 fc::variant CommonApiRpcServer::about_positional(fc::rpc::json_connection* json_connection, const fc::variants& parameters)
 {
   // this method has no prerequisites
@@ -4841,6 +5383,14 @@ void CommonApiRpcServer::register_common_api_methods(const fc::rpc::json_connect
                                         this, capture_con, _1);
   json_connection->add_named_param_method("blockchain_get_transaction", bound_named_method);
 
+  // register method blockchain_get_pretty_transaction
+  bound_positional_method = boost::bind(&CommonApiRpcServer::blockchain_get_pretty_transaction_positional, 
+                                        this, capture_con, _1);
+  json_connection->add_method("blockchain_get_pretty_transaction", bound_positional_method);
+  bound_named_method = boost::bind(&CommonApiRpcServer::blockchain_get_pretty_transaction_named, 
+                                        this, capture_con, _1);
+  json_connection->add_named_param_method("blockchain_get_pretty_transaction", bound_named_method);
+
   // register method blockchain_get_block
   bound_positional_method = boost::bind(&CommonApiRpcServer::blockchain_get_block_positional, 
                                         this, capture_con, _1);
@@ -5077,6 +5627,14 @@ void CommonApiRpcServer::register_common_api_methods(const fc::rpc::json_connect
                                         this, capture_con, _1);
   json_connection->add_named_param_method("blockchain_btc_address_convert", bound_named_method);
 
+  // register method blockchain_get_transaction_rpc
+  bound_positional_method = boost::bind(&CommonApiRpcServer::blockchain_get_transaction_rpc_positional, 
+                                        this, capture_con, _1);
+  json_connection->add_method("blockchain_get_transaction_rpc", bound_positional_method);
+  bound_named_method = boost::bind(&CommonApiRpcServer::blockchain_get_transaction_rpc_named, 
+                                        this, capture_con, _1);
+  json_connection->add_named_param_method("blockchain_get_transaction_rpc", bound_named_method);
+
   // register method network_add_node
   bound_positional_method = boost::bind(&CommonApiRpcServer::network_add_node_positional, 
                                         this, capture_con, _1);
@@ -5169,6 +5727,14 @@ void CommonApiRpcServer::register_common_api_methods(const fc::rpc::json_connect
                                         this, capture_con, _1);
   json_connection->add_named_param_method("network_get_upnp_info", bound_named_method);
 
+  // register method network_get_blocked_ips
+  bound_positional_method = boost::bind(&CommonApiRpcServer::network_get_blocked_ips_positional, 
+                                        this, capture_con, _1);
+  json_connection->add_method("network_get_blocked_ips", bound_positional_method);
+  bound_named_method = boost::bind(&CommonApiRpcServer::network_get_blocked_ips_named, 
+                                        this, capture_con, _1);
+  json_connection->add_named_param_method("network_get_blocked_ips", bound_named_method);
+
   // register method debug_get_client_name
   bound_positional_method = boost::bind(&CommonApiRpcServer::debug_get_client_name_positional, 
                                         this, capture_con, _1);
@@ -5200,6 +5766,22 @@ void CommonApiRpcServer::register_common_api_methods(const fc::rpc::json_connect
   bound_named_method = boost::bind(&CommonApiRpcServer::delegate_set_block_max_transaction_count_named, 
                                         this, capture_con, _1);
   json_connection->add_named_param_method("delegate_set_block_max_transaction_count", bound_named_method);
+
+  // register method delegate_set_soft_max_imessage_length
+  bound_positional_method = boost::bind(&CommonApiRpcServer::delegate_set_soft_max_imessage_length_positional, 
+                                        this, capture_con, _1);
+  json_connection->add_method("delegate_set_soft_max_imessage_length", bound_positional_method);
+  bound_named_method = boost::bind(&CommonApiRpcServer::delegate_set_soft_max_imessage_length_named, 
+                                        this, capture_con, _1);
+  json_connection->add_named_param_method("delegate_set_soft_max_imessage_length", bound_named_method);
+
+  // register method delegate_set_imessage_fee_coe
+  bound_positional_method = boost::bind(&CommonApiRpcServer::delegate_set_imessage_fee_coe_positional, 
+                                        this, capture_con, _1);
+  json_connection->add_method("delegate_set_imessage_fee_coe", bound_positional_method);
+  bound_named_method = boost::bind(&CommonApiRpcServer::delegate_set_imessage_fee_coe_named, 
+                                        this, capture_con, _1);
+  json_connection->add_named_param_method("delegate_set_imessage_fee_coe", bound_named_method);
 
   // register method delegate_set_block_max_size
   bound_positional_method = boost::bind(&CommonApiRpcServer::delegate_set_block_max_size_positional, 
@@ -5505,6 +6087,18 @@ void CommonApiRpcServer::register_common_api_methods(const fc::rpc::json_connect
   json_connection->add_named_param_method("wallet_approve_delegate", bound_named_method);
   json_connection->add_named_param_method("wallet_approve", bound_named_method);
 
+  // register method wallet_get_all_approved_accounts
+  bound_positional_method = boost::bind(&CommonApiRpcServer::wallet_get_all_approved_accounts_positional, 
+                                        this, capture_con, _1);
+  json_connection->add_method("wallet_get_all_approved_accounts", bound_positional_method);
+  json_connection->add_method("all_approved_accounts", bound_positional_method);
+  json_connection->add_method("approved_accounts", bound_positional_method);
+  bound_named_method = boost::bind(&CommonApiRpcServer::wallet_get_all_approved_accounts_named, 
+                                        this, capture_con, _1);
+  json_connection->add_named_param_method("wallet_get_all_approved_accounts", bound_named_method);
+  json_connection->add_named_param_method("all_approved_accounts", bound_named_method);
+  json_connection->add_named_param_method("approved_accounts", bound_named_method);
+
   // register method wallet_address_create
   bound_positional_method = boost::bind(&CommonApiRpcServer::wallet_address_create_positional, 
                                         this, capture_con, _1);
@@ -5661,6 +6255,14 @@ void CommonApiRpcServer::register_common_api_methods(const fc::rpc::json_connect
                                         this, capture_con, _1);
   json_connection->add_named_param_method("wallet_list_my_accounts", bound_named_method);
 
+  // register method wallet_list_my_addresses
+  bound_positional_method = boost::bind(&CommonApiRpcServer::wallet_list_my_addresses_positional, 
+                                        this, capture_con, _1);
+  json_connection->add_method("wallet_list_my_addresses", bound_positional_method);
+  bound_named_method = boost::bind(&CommonApiRpcServer::wallet_list_my_addresses_named, 
+                                        this, capture_con, _1);
+  json_connection->add_named_param_method("wallet_list_my_addresses", bound_named_method);
+
   // register method wallet_get_account
   bound_positional_method = boost::bind(&CommonApiRpcServer::wallet_get_account_positional, 
                                         this, capture_con, _1);
@@ -5769,6 +6371,14 @@ void CommonApiRpcServer::register_common_api_methods(const fc::rpc::json_connect
   json_connection->add_named_param_method("wallet_delegate_pay_balance_query", bound_named_method);
   json_connection->add_named_param_method("query_salary", bound_named_method);
 
+  // register method wallet_active_delegate_salary
+  bound_positional_method = boost::bind(&CommonApiRpcServer::wallet_active_delegate_salary_positional, 
+                                        this, capture_con, _1);
+  json_connection->add_method("wallet_active_delegate_salary", bound_positional_method);
+  bound_named_method = boost::bind(&CommonApiRpcServer::wallet_active_delegate_salary_named, 
+                                        this, capture_con, _1);
+  json_connection->add_named_param_method("wallet_active_delegate_salary", bound_named_method);
+
   // register method wallet_get_delegate_statue
   bound_positional_method = boost::bind(&CommonApiRpcServer::wallet_get_delegate_statue_positional, 
                                         this, capture_con, _1);
@@ -5776,6 +6386,46 @@ void CommonApiRpcServer::register_common_api_methods(const fc::rpc::json_connect
   bound_named_method = boost::bind(&CommonApiRpcServer::wallet_get_delegate_statue_named, 
                                         this, capture_con, _1);
   json_connection->add_named_param_method("wallet_get_delegate_statue", bound_named_method);
+
+  // register method wallet_set_transaction_imessage_fee_coe
+  bound_positional_method = boost::bind(&CommonApiRpcServer::wallet_set_transaction_imessage_fee_coe_positional, 
+                                        this, capture_con, _1);
+  json_connection->add_method("wallet_set_transaction_imessage_fee_coe", bound_positional_method);
+  json_connection->add_method("set_fee_coe", bound_positional_method);
+  bound_named_method = boost::bind(&CommonApiRpcServer::wallet_set_transaction_imessage_fee_coe_named, 
+                                        this, capture_con, _1);
+  json_connection->add_named_param_method("wallet_set_transaction_imessage_fee_coe", bound_named_method);
+  json_connection->add_named_param_method("set_fee_coe", bound_named_method);
+
+  // register method wallet_get_transaction_imessage_fee_coe
+  bound_positional_method = boost::bind(&CommonApiRpcServer::wallet_get_transaction_imessage_fee_coe_positional, 
+                                        this, capture_con, _1);
+  json_connection->add_method("wallet_get_transaction_imessage_fee_coe", bound_positional_method);
+  json_connection->add_method("get_fee_coe", bound_positional_method);
+  bound_named_method = boost::bind(&CommonApiRpcServer::wallet_get_transaction_imessage_fee_coe_named, 
+                                        this, capture_con, _1);
+  json_connection->add_named_param_method("wallet_get_transaction_imessage_fee_coe", bound_named_method);
+  json_connection->add_named_param_method("get_fee_coe", bound_named_method);
+
+  // register method wallet_set_transaction_imessage_soft_max_length
+  bound_positional_method = boost::bind(&CommonApiRpcServer::wallet_set_transaction_imessage_soft_max_length_positional, 
+                                        this, capture_con, _1);
+  json_connection->add_method("wallet_set_transaction_imessage_soft_max_length", bound_positional_method);
+  json_connection->add_method("set_soft_length", bound_positional_method);
+  bound_named_method = boost::bind(&CommonApiRpcServer::wallet_set_transaction_imessage_soft_max_length_named, 
+                                        this, capture_con, _1);
+  json_connection->add_named_param_method("wallet_set_transaction_imessage_soft_max_length", bound_named_method);
+  json_connection->add_named_param_method("set_soft_length", bound_named_method);
+
+  // register method wallet_get_transaction_imessage_soft_max_length
+  bound_positional_method = boost::bind(&CommonApiRpcServer::wallet_get_transaction_imessage_soft_max_length_positional, 
+                                        this, capture_con, _1);
+  json_connection->add_method("wallet_get_transaction_imessage_soft_max_length", bound_positional_method);
+  json_connection->add_method("get_soft_length", bound_positional_method);
+  bound_named_method = boost::bind(&CommonApiRpcServer::wallet_get_transaction_imessage_soft_max_length_named, 
+                                        this, capture_con, _1);
+  json_connection->add_named_param_method("wallet_get_transaction_imessage_soft_max_length", bound_named_method);
+  json_connection->add_named_param_method("get_soft_length", bound_named_method);
 
   // register method wallet_set_transaction_fee
   bound_positional_method = boost::bind(&CommonApiRpcServer::wallet_set_transaction_fee_positional, 
@@ -5989,6 +6639,30 @@ void CommonApiRpcServer::register_common_api_methods(const fc::rpc::json_connect
                                         this, capture_con, _1);
   json_connection->add_named_param_method("wallet_account_delete", bound_named_method);
 
+  // register method wallet_transfer_to_address_rpc
+  bound_positional_method = boost::bind(&CommonApiRpcServer::wallet_transfer_to_address_rpc_positional, 
+                                        this, capture_con, _1);
+  json_connection->add_method("wallet_transfer_to_address_rpc", bound_positional_method);
+  bound_named_method = boost::bind(&CommonApiRpcServer::wallet_transfer_to_address_rpc_named, 
+                                        this, capture_con, _1);
+  json_connection->add_named_param_method("wallet_transfer_to_address_rpc", bound_named_method);
+
+  // register method wallet_account_balance_rpc
+  bound_positional_method = boost::bind(&CommonApiRpcServer::wallet_account_balance_rpc_positional, 
+                                        this, capture_con, _1);
+  json_connection->add_method("wallet_account_balance_rpc", bound_positional_method);
+  bound_named_method = boost::bind(&CommonApiRpcServer::wallet_account_balance_rpc_named, 
+                                        this, capture_con, _1);
+  json_connection->add_named_param_method("wallet_account_balance_rpc", bound_named_method);
+
+  // register method wallet_transfer_to_public_account_rpc
+  bound_positional_method = boost::bind(&CommonApiRpcServer::wallet_transfer_to_public_account_rpc_positional, 
+                                        this, capture_con, _1);
+  json_connection->add_method("wallet_transfer_to_public_account_rpc", bound_positional_method);
+  bound_named_method = boost::bind(&CommonApiRpcServer::wallet_transfer_to_public_account_rpc_named, 
+                                        this, capture_con, _1);
+  json_connection->add_named_param_method("wallet_transfer_to_public_account_rpc", bound_named_method);
+
   // register method about
   bound_positional_method = boost::bind(&CommonApiRpcServer::about_positional, 
                                         this, capture_con, _1);
@@ -6178,13 +6852,13 @@ void CommonApiRpcServer::register_common_api_method_metadata()
   {
     // register method blockchain_get_gop_account_balance_entry
     goopal::api::MethodData blockchain_get_gop_account_balance_entry_method_metadata{"blockchain_get_gop_account_balance_entry", nullptr,
-      /* description */ "gop_account",
+      /* description */ "fetch all GopTrxidBalance from block where blocknum of the block lower than block_num or equal to block_num.",
       /* returns */ "vector<gop_trxid_balance>",
       /* params: */ {
         {"block_num", "uint32_t", goopal::api::required_positional, fc::ovariant()}
       },
       /* prerequisites */ (goopal::api::MethodPrerequisites) 0,
-      /* detailed description */ "gop_account\n\nParameters:\n  block_num (uint32_t, required): \n\nReturns:\n  vector<gop_trxid_balance>\n",
+      /* detailed description */ "fetch all GopTrxidBalance from block where blocknum of the block lower than block_num or equal to block_num.\n\nParameters:\n  block_num (uint32_t, required): \n\nReturns:\n  vector<gop_trxid_balance>\n",
       /* aliases */ {}, false};
     store_method_metadata(blockchain_get_gop_account_balance_entry_method_metadata);
   }
@@ -6333,6 +7007,21 @@ void CommonApiRpcServer::register_common_api_method_metadata()
       /* detailed description */ "Get detailed information about an in-wallet transaction\n\nParameters:\n  transaction_id_prefix (string, required): the base58 transaction ID to return\n  exact (bool, optional, defaults to false): whether or not a partial match is ok\n\nReturns:\n  transaction_entry_pair\n",
       /* aliases */ {}, true};
     store_method_metadata(blockchain_get_transaction_method_metadata);
+  }
+
+  {
+    // register method blockchain_get_pretty_transaction
+    goopal::api::MethodData blockchain_get_pretty_transaction_method_metadata{"blockchain_get_pretty_transaction", nullptr,
+      /* description */ "Get pretty information about an in-wallet transaction",
+      /* returns */ "pretty_transaction",
+      /* params: */ {
+        {"transaction_id_prefix", "string", goopal::api::required_positional, fc::ovariant()},
+        {"exact", "bool", goopal::api::optional_positional, fc::variant(fc::json::from_string("false"))}
+      },
+      /* prerequisites */ (goopal::api::MethodPrerequisites) 0,
+      /* detailed description */ "Get pretty information about an in-wallet transaction\n\nParameters:\n  transaction_id_prefix (string, required): the base58 transaction ID to return\n  exact (bool, optional, defaults to false): whether or not a partial match is ok\n\nReturns:\n  pretty_transaction\n",
+      /* aliases */ {}, true};
+    store_method_metadata(blockchain_get_pretty_transaction_method_metadata);
   }
 
   {
@@ -6559,10 +7248,10 @@ void CommonApiRpcServer::register_common_api_method_metadata()
       /* params: */ {
         {"start_block", "uint32_t", goopal::api::optional_positional, fc::variant(fc::json::from_string("1"))},
         {"end_block", "uint32_t", goopal::api::optional_positional, fc::variant(fc::json::from_string("-1"))},
-        {"filename", "string", goopal::api::optional_positional, fc::variant(fc::json::from_string("\"\""))}
+        {"filename", "path", goopal::api::optional_positional, fc::variant(fc::json::from_string("\"\""))}
       },
       /* prerequisites */ (goopal::api::MethodPrerequisites) 0,
-      /* detailed description */ "dumps the fork data to graphviz format\n\nParameters:\n  start_block (uint32_t, optional, defaults to 1): the first block number to consider\n  end_block (uint32_t, optional, defaults to -1): the last block number to consider\n  filename (string, optional, defaults to \"\"): the filename to save to\n\nReturns:\n  string\n",
+      /* detailed description */ "dumps the fork data to graphviz format\n\nParameters:\n  start_block (uint32_t, optional, defaults to 1): the first block number to consider\n  end_block (uint32_t, optional, defaults to -1): the last block number to consider\n  filename (path, optional, defaults to \"\"): the filename to save to\n\nReturns:\n  string\n",
       /* aliases */ {"export_forks"}, false};
     store_method_metadata(blockchain_export_fork_graph_method_metadata);
   }
@@ -6676,6 +7365,21 @@ void CommonApiRpcServer::register_common_api_method_metadata()
       /* detailed description */ "Convert bitcoin address file to goopal address file.\n\nParameters:\n  path (string, required): The bitcoin address file path.\n\nReturns:\n  void\n",
       /* aliases */ {}, true};
     store_method_metadata(blockchain_btc_address_convert_method_metadata);
+  }
+
+  {
+    // register method blockchain_get_transaction_rpc
+    goopal::api::MethodData blockchain_get_transaction_rpc_method_metadata{"blockchain_get_transaction_rpc", nullptr,
+      /* description */ "Get detailed information about an in-wallet transaction",
+      /* returns */ "string",
+      /* params: */ {
+        {"transaction_id_prefix", "string", goopal::api::required_positional, fc::ovariant()},
+        {"exact", "bool", goopal::api::optional_positional, fc::variant(fc::json::from_string("false"))}
+      },
+      /* prerequisites */ (goopal::api::MethodPrerequisites) 0,
+      /* detailed description */ "Get detailed information about an in-wallet transaction\n\nParameters:\n  transaction_id_prefix (string, required): the base58 transaction ID to return\n  exact (bool, optional, defaults to false): whether or not a partial match is ok\n\nReturns:\n  string\n",
+      /* aliases */ {}, true};
+    store_method_metadata(blockchain_get_transaction_rpc_method_metadata);
   }
 
   {
@@ -6824,6 +7528,18 @@ void CommonApiRpcServer::register_common_api_method_metadata()
   }
 
   {
+    // register method network_get_blocked_ips
+    goopal::api::MethodData network_get_blocked_ips_method_metadata{"network_get_blocked_ips", nullptr,
+      /* description */ "Get list of ips in blacklist",
+      /* returns */ "block_ip_array",
+      /* params: */ {},
+      /* prerequisites */ (goopal::api::MethodPrerequisites) 1,
+      /* detailed description */ "Get list of ips in blacklist\n\nParameters:\n  (none)\n\nReturns:\n  block_ip_array\n",
+      /* aliases */ {}, false};
+    store_method_metadata(network_get_blocked_ips_method_metadata);
+  }
+
+  {
     // register method debug_get_client_name
     goopal::api::MethodData debug_get_client_name_method_metadata{"debug_get_client_name", nullptr,
       /* description */ "Returns client's debug name specified in config.json",
@@ -6873,6 +7589,34 @@ void CommonApiRpcServer::register_common_api_method_metadata()
       /* detailed description */ "Set maximum number of transactions allowed in a block\n\nParameters:\n  count (uint32_t, required): maximum transaction count\n\nReturns:\n  void\n",
       /* aliases */ {}, false};
     store_method_metadata(delegate_set_block_max_transaction_count_method_metadata);
+  }
+
+  {
+    // register method delegate_set_soft_max_imessage_length
+    goopal::api::MethodData delegate_set_soft_max_imessage_length_method_metadata{"delegate_set_soft_max_imessage_length", nullptr,
+      /* description */ "Set soft max length",
+      /* returns */ "void",
+      /* params: */ {
+        {"soft_length", "int64_t", goopal::api::required_positional, fc::ovariant()}
+      },
+      /* prerequisites */ (goopal::api::MethodPrerequisites) 0,
+      /* detailed description */ "Set soft max length\n\nParameters:\n  soft_length (int64_t, required): soft max length\n\nReturns:\n  void\n",
+      /* aliases */ {}, false};
+    store_method_metadata(delegate_set_soft_max_imessage_length_method_metadata);
+  }
+
+  {
+    // register method delegate_set_imessage_fee_coe
+    goopal::api::MethodData delegate_set_imessage_fee_coe_method_metadata{"delegate_set_imessage_fee_coe", nullptr,
+      /* description */ "Set fee coe",
+      /* returns */ "void",
+      /* params: */ {
+        {"fee_coe", "string", goopal::api::required_positional, fc::ovariant()}
+      },
+      /* prerequisites */ (goopal::api::MethodPrerequisites) 0,
+      /* detailed description */ "Set fee coe\n\nParameters:\n  fee_coe (string, required): imessage fee coe\n\nReturns:\n  void\n",
+      /* aliases */ {}, false};
+    store_method_metadata(delegate_set_imessage_fee_coe_method_metadata);
   }
 
   {
@@ -7198,10 +7942,10 @@ void CommonApiRpcServer::register_common_api_method_metadata()
       /* description */ "Return any errors for your currently pending transactions",
       /* returns */ "map<transaction_id_type, fc::exception>",
       /* params: */ {
-        {"filename", "string", goopal::api::optional_positional, fc::variant(fc::json::from_string("\"\""))}
+        {"filename", "path", goopal::api::optional_positional, fc::variant(fc::json::from_string("\"\""))}
       },
       /* prerequisites */ (goopal::api::MethodPrerequisites) 2,
-      /* detailed description */ "Return any errors for your currently pending transactions\n\nParameters:\n  filename (string, optional, defaults to \"\"): filename to save pending transaction errors to\n\nReturns:\n  map<transaction_id_type, fc::exception>\n",
+      /* detailed description */ "Return any errors for your currently pending transactions\n\nParameters:\n  filename (path, optional, defaults to \"\"): filename to save pending transaction errors to\n\nReturns:\n  map<transaction_id_type, fc::exception>\n",
       /* aliases */ {}, false};
     store_method_metadata(wallet_get_pending_transaction_errors_method_metadata);
   }
@@ -7265,13 +8009,13 @@ void CommonApiRpcServer::register_common_api_method_metadata()
   {
     // register method wallet_check_address
     goopal::api::MethodData wallet_check_address_method_metadata{"wallet_check_address", nullptr,
-      /* description */ "check address is valid",
+      /* description */ "check address is valid address or an acount name.",
       /* returns */ "bool",
       /* params: */ {
         {"address", "string", goopal::api::required_positional, fc::ovariant()}
       },
       /* prerequisites */ (goopal::api::MethodPrerequisites) 2,
-      /* detailed description */ "check address is valid\n\nThis will check the address.\n\nParameters:\n  address (string, required): the address to be checking\n\nReturns:\n  bool\n",
+      /* detailed description */ "check address is valid address or an acount name.\n\nThis will check the address.\n\nParameters:\n  address (string, required): the address/accountname to be checking (string, required)\n\nReturns:\n  bool\n",
       /* aliases */ {"check_address"}, false};
     store_method_metadata(wallet_check_address_method_metadata);
   }
@@ -7292,13 +8036,13 @@ void CommonApiRpcServer::register_common_api_method_metadata()
     // register method wallet_account_create
     goopal::api::MethodData wallet_account_create_method_metadata{"wallet_account_create", nullptr,
       /* description */ "Add new account for receiving payments",
-      /* returns */ "public_key",
+      /* returns */ "address",
       /* params: */ {
         {"account_name", "account_name", goopal::api::required_positional, fc::ovariant()},
         {"private_data", "json_variant", goopal::api::optional_positional, fc::variant(fc::json::from_string("null"))}
       },
       /* prerequisites */ (goopal::api::MethodPrerequisites) 4,
-      /* detailed description */ "Add new account for receiving payments\n\nParameters:\n  account_name (account_name, required): the name you will use to refer to this receive account\n  private_data (json_variant, optional, defaults to null): Extra data to store with this account entry\n\nReturns:\n  public_key\n",
+      /* detailed description */ "Add new account for receiving payments\n\nParameters:\n  account_name (account_name, required): the name you will use to refer to this receive account\n  private_data (json_variant, optional, defaults to null): Extra data to store with this account entry\n\nReturns:\n  address\n",
       /* aliases */ {"wallet_create_account", "create_account"}, false};
     store_method_metadata(wallet_account_create_method_metadata);
   }
@@ -7316,6 +8060,20 @@ void CommonApiRpcServer::register_common_api_method_metadata()
       /* detailed description */ "Updates your approval of the specified account\n\nParameters:\n  account_name (account_name, required): the name of the account to set approval for\n  approval (int8_t, optional, defaults to 1): 1, 0, or -1 respectively for approve, neutral, or disapprove\n\nReturns:\n  int8_t\n",
       /* aliases */ {"approve", "set_approval", "wallet_approve_delegate", "wallet_approve"}, false};
     store_method_metadata(wallet_account_set_approval_method_metadata);
+  }
+
+  {
+    // register method wallet_get_all_approved_accounts
+    goopal::api::MethodData wallet_get_all_approved_accounts_method_metadata{"wallet_get_all_approved_accounts", nullptr,
+      /* description */ "Return all approved account entrys",
+      /* returns */ "account_entry_array",
+      /* params: */ {
+        {"approval", "int8_t", goopal::api::optional_positional, fc::variant(fc::json::from_string("1"))}
+      },
+      /* prerequisites */ (goopal::api::MethodPrerequisites) 2,
+      /* detailed description */ "Return all approved account entrys\n\nParameters:\n  approval (int8_t, optional, defaults to 1): 1, 0, or -1 respectively for approve, neutral, or disapprove\n\nReturns:\n  account_entry_array\n",
+      /* aliases */ {"all_approved_accounts", "approved_accounts"}, false};
+    store_method_metadata(wallet_get_all_approved_accounts_method_metadata);
   }
 
   {
@@ -7340,15 +8098,15 @@ void CommonApiRpcServer::register_common_api_method_metadata()
       /* description */ "Do a simple (non-TITAN) transfer to an address",
       /* returns */ "transaction_entry",
       /* params: */ {
-        {"amount_to_transfer", "real_amount", goopal::api::required_positional, fc::ovariant()},
+        {"amount_to_transfer", "string", goopal::api::required_positional, fc::ovariant()},
         {"asset_symbol", "asset_symbol", goopal::api::required_positional, fc::ovariant()},
         {"from_account_name", "account_name", goopal::api::required_positional, fc::ovariant()},
         {"to_address", "string", goopal::api::required_positional, fc::ovariant()},
-        {"memo_message", "string", goopal::api::optional_positional, fc::variant(fc::json::from_string("\"\""))},
+        {"memo_message", "information", goopal::api::optional_positional, fc::variant(fc::json::from_string("\"\""))},
         {"strategy", "vote_strategy", goopal::api::optional_positional, fc::variant(fc::json::from_string("\"vote_recommended\""))}
       },
       /* prerequisites */ (goopal::api::MethodPrerequisites) 2,
-      /* detailed description */ "Do a simple (non-TITAN) transfer to an address\n\nParameters:\n  amount_to_transfer (real_amount, required): the amount of shares to transfer\n  asset_symbol (asset_symbol, required): the asset to transfer\n  from_account_name (account_name, required): the source account to draw the shares from\n  to_address (string, required): the address or pubkey to transfer to\n  memo_message (string, optional, defaults to \"\"): a memo to store with the transaction\n  strategy (vote_strategy, optional, defaults to \"vote_recommended\"): enumeration [vote_none | vote_all | vote_random | vote_recommended] \n\nReturns:\n  transaction_entry\n",
+      /* detailed description */ "Do a simple (non-TITAN) transfer to an address\n\nParameters:\n  amount_to_transfer (string, required): the amount of shares to transfer\n  asset_symbol (asset_symbol, required): the asset to transfer\n  from_account_name (account_name, required): the source account to draw the shares from\n  to_address (string, required): the address or pubkey to transfer to\n  memo_message (information, optional, defaults to \"\"): a memo to store with the transaction\n  strategy (vote_strategy, optional, defaults to \"vote_recommended\"): enumeration [vote_none | vote_all | vote_random | vote_recommended] \n\nReturns:\n  transaction_entry\n",
       /* aliases */ {}, false};
     store_method_metadata(wallet_transfer_to_address_method_metadata);
   }
@@ -7359,15 +8117,15 @@ void CommonApiRpcServer::register_common_api_method_metadata()
       /* description */ "Sends given amount to the given account",
       /* returns */ "transaction_entry",
       /* params: */ {
-        {"amount_to_transfer", "real_amount", goopal::api::required_positional, fc::ovariant()},
+        {"amount_to_transfer", "string", goopal::api::required_positional, fc::ovariant()},
         {"asset_symbol", "asset_symbol", goopal::api::required_positional, fc::ovariant()},
         {"from_account_name", "sending_account_name", goopal::api::required_positional, fc::ovariant()},
         {"to_account_name", "receive_account_name", goopal::api::required_positional, fc::ovariant()},
-        {"memo_message", "string", goopal::api::optional_positional, fc::variant(fc::json::from_string("\"\""))},
+        {"memo_message", "information", goopal::api::optional_positional, fc::variant(fc::json::from_string("\"\""))},
         {"strategy", "vote_strategy", goopal::api::optional_positional, fc::variant(fc::json::from_string("\"vote_recommended\""))}
       },
       /* prerequisites */ (goopal::api::MethodPrerequisites) 4,
-      /* detailed description */ "Sends given amount to the given account\n\nParameters:\n  amount_to_transfer (real_amount, required): the amount of shares to transfer\n  asset_symbol (asset_symbol, required): the asset to transfer\n  from_account_name (sending_account_name, required): the source account to draw the shares from\n  to_account_name (receive_account_name, required): the account to transfer the shares to\n  memo_message (string, optional, defaults to \"\"): a memo to store with the transaction\n  strategy (vote_strategy, optional, defaults to \"vote_recommended\"): enumeration [vote_none | vote_all | vote_random | vote_recommended] \n\nReturns:\n  transaction_entry\n",
+      /* detailed description */ "Sends given amount to the given account\n\nParameters:\n  amount_to_transfer (string, required): the amount of shares to transfer\n  asset_symbol (asset_symbol, required): the asset to transfer\n  from_account_name (sending_account_name, required): the source account to draw the shares from\n  to_account_name (receive_account_name, required): the account to transfer the shares to\n  memo_message (information, optional, defaults to \"\"): a memo to store with the transaction\n  strategy (vote_strategy, optional, defaults to \"vote_recommended\"): enumeration [vote_none | vote_all | vote_random | vote_recommended] \n\nReturns:\n  transaction_entry\n",
       /* aliases */ {"transfer_public"}, false};
     store_method_metadata(wallet_transfer_to_public_account_method_metadata);
   }
@@ -7565,6 +8323,18 @@ void CommonApiRpcServer::register_common_api_method_metadata()
   }
 
   {
+    // register method wallet_list_my_addresses
+    goopal::api::MethodData wallet_list_my_addresses_method_metadata{"wallet_list_my_addresses", nullptr,
+      /* description */ "Lists all accounts and account addresses for which we have a private key in this wallet",
+      /* returns */ "account_address_entry_array",
+      /* params: */ {},
+      /* prerequisites */ (goopal::api::MethodPrerequisites) 2,
+      /* detailed description */ "Lists all accounts and account addresses for which we have a private key in this wallet\n\nParameters:\n  (none)\n\nReturns:\n  account_address_entry_array\n",
+      /* aliases */ {}, false};
+    store_method_metadata(wallet_list_my_addresses_method_metadata);
+  }
+
+  {
     // register method wallet_get_account
     goopal::api::MethodData wallet_get_account_method_metadata{"wallet_get_account", nullptr,
       /* description */ "Get the account entry for a given name",
@@ -7631,13 +8401,13 @@ void CommonApiRpcServer::register_common_api_method_metadata()
         {"asset_name", "string", goopal::api::required_positional, fc::ovariant()},
         {"issuer_name", "string", goopal::api::required_positional, fc::ovariant()},
         {"description", "string", goopal::api::required_positional, fc::ovariant()},
-        {"maximum_share_supply", "real_amount", goopal::api::required_positional, fc::ovariant()},
+        {"maximum_share_supply", "string", goopal::api::required_positional, fc::ovariant()},
         {"precision", "uint64_t", goopal::api::required_positional, fc::ovariant()},
         {"public_data", "json_variant", goopal::api::optional_positional, fc::variant(fc::json::from_string("null"))},
         {"is_market_issued", "bool", goopal::api::optional_positional, fc::variant(fc::json::from_string("false"))}
       },
       /* prerequisites */ (goopal::api::MethodPrerequisites) 4,
-      /* detailed description */ "Creates a new user issued asset\n\nParameters:\n  symbol (asset_symbol, required): the ticker symbol for the new asset\n  asset_name (string, required): the name of the asset\n  issuer_name (string, required): the name of the issuer of the asset\n  description (string, required): a description of the asset\n  maximum_share_supply (real_amount, required): the maximum number of shares of the asset\n  precision (uint64_t, required): defines where the decimal should be displayed, must be a power of 10\n  public_data (json_variant, optional, defaults to null): arbitrary data attached to the asset\n  is_market_issued (bool, optional, defaults to false): creation of a new BitAsset that is created by shorting\n\nReturns:\n  transaction_entry\n",
+      /* detailed description */ "Creates a new user issued asset\n\nParameters:\n  symbol (asset_symbol, required): the ticker symbol for the new asset\n  asset_name (string, required): the name of the asset\n  issuer_name (string, required): the name of the issuer of the asset\n  description (string, required): a description of the asset\n  maximum_share_supply (string, required): the maximum number of shares of the asset\n  precision (uint64_t, required): defines where the decimal should be displayed, must be a power of 10\n  public_data (json_variant, optional, defaults to null): arbitrary data attached to the asset\n  is_market_issued (bool, optional, defaults to false): creation of a new BitAsset that is created by shorting\n\nReturns:\n  transaction_entry\n",
       /* aliases */ {}, false};
     store_method_metadata(wallet_asset_create_method_metadata);
   }
@@ -7648,13 +8418,13 @@ void CommonApiRpcServer::register_common_api_method_metadata()
       /* description */ "Issues new shares of a given asset type",
       /* returns */ "transaction_entry",
       /* params: */ {
-        {"amount", "real_amount", goopal::api::required_positional, fc::ovariant()},
+        {"amount", "string", goopal::api::required_positional, fc::ovariant()},
         {"symbol", "asset_symbol", goopal::api::required_positional, fc::ovariant()},
         {"to_account_name", "account_name", goopal::api::required_positional, fc::ovariant()},
-        {"memo_message", "string", goopal::api::optional_positional, fc::variant(fc::json::from_string("\"\""))}
+        {"memo_message", "information", goopal::api::optional_positional, fc::variant(fc::json::from_string("\"\""))}
       },
       /* prerequisites */ (goopal::api::MethodPrerequisites) 4,
-      /* detailed description */ "Issues new shares of a given asset type\n\nThe asset being issued must have been created via wallet_asset_create in a previous block.\n\nParameters:\n  amount (real_amount, required): the amount of shares to issue\n  symbol (asset_symbol, required): the ticker symbol for asset\n  to_account_name (account_name, required): the name of the account to receive the shares\n  memo_message (string, optional, defaults to \"\"): the memo to send to the receiver\n\nReturns:\n  transaction_entry\n",
+      /* detailed description */ "Issues new shares of a given asset type\n\nThe asset being issued must have been created via wallet_asset_create in a previous block.\n\nParameters:\n  amount (string, required): the amount of shares to issue\n  symbol (asset_symbol, required): the ticker symbol for asset\n  to_account_name (account_name, required): the name of the account to receive the shares\n  memo_message (information, optional, defaults to \"\"): the memo to send to the receiver\n\nReturns:\n  transaction_entry\n",
       /* aliases */ {}, false};
     store_method_metadata(wallet_asset_issue_method_metadata);
   }
@@ -7724,10 +8494,10 @@ void CommonApiRpcServer::register_common_api_method_metadata()
       /* params: */ {
         {"delegate_name", "account_name", goopal::api::required_positional, fc::ovariant()},
         {"to_account_name", "account_name", goopal::api::required_positional, fc::ovariant()},
-        {"amount_to_withdraw", "real_amount", goopal::api::required_positional, fc::ovariant()}
+        {"amount_to_withdraw", "string", goopal::api::required_positional, fc::ovariant()}
       },
       /* prerequisites */ (goopal::api::MethodPrerequisites) 4,
-      /* detailed description */ "Used to transfer some of the delegate's pay from their balance\n\nParameters:\n  delegate_name (account_name, required): the delegate whose pay is being cashed out\n  to_account_name (account_name, required): the account that should receive the funds\n  amount_to_withdraw (real_amount, required): the amount to withdraw\n\nReturns:\n  transaction_entry\n",
+      /* detailed description */ "Used to transfer some of the delegate's pay from their balance\n\nParameters:\n  delegate_name (account_name, required): the delegate whose pay is being cashed out\n  to_account_name (account_name, required): the account that should receive the funds\n  amount_to_withdraw (string, required): the amount to withdraw\n\nReturns:\n  transaction_entry\n",
       /* aliases */ {"pay_delegate"}, false};
     store_method_metadata(wallet_delegate_withdraw_pay_method_metadata);
   }
@@ -7736,14 +8506,26 @@ void CommonApiRpcServer::register_common_api_method_metadata()
     // register method wallet_delegate_pay_balance_query
     goopal::api::MethodData wallet_delegate_pay_balance_query_method_metadata{"wallet_delegate_pay_balance_query", nullptr,
       /* description */ "query delegate's pay balance",
-      /* returns */ "amount",
+      /* returns */ "delegate_salarys",
       /* params: */ {
         {"delegate_name", "account_name", goopal::api::required_positional, fc::ovariant()}
       },
       /* prerequisites */ (goopal::api::MethodPrerequisites) 4,
-      /* detailed description */ "query delegate's pay balance\n\nParameters:\n  delegate_name (account_name, required): the delegate whose pay is being cashed out\n\nReturns:\n  amount\n",
+      /* detailed description */ "query delegate's pay balance\n\nParameters:\n  delegate_name (account_name, required): the delegate whose pay is being cashed out\n\nReturns:\n  delegate_salarys\n",
       /* aliases */ {"query_salary"}, false};
     store_method_metadata(wallet_delegate_pay_balance_query_method_metadata);
+  }
+
+  {
+    // register method wallet_active_delegate_salary
+    goopal::api::MethodData wallet_active_delegate_salary_method_metadata{"wallet_active_delegate_salary", nullptr,
+      /* description */ "query delegate's pay balance",
+      /* returns */ "delegate_salary_map",
+      /* params: */ {},
+      /* prerequisites */ (goopal::api::MethodPrerequisites) 4,
+      /* detailed description */ "query delegate's pay balance\n\nParameters:\n  (none)\n\nReturns:\n  delegate_salary_map\n",
+      /* aliases */ {}, false};
+    store_method_metadata(wallet_active_delegate_salary_method_metadata);
   }
 
   {
@@ -7761,15 +8543,67 @@ void CommonApiRpcServer::register_common_api_method_metadata()
   }
 
   {
+    // register method wallet_set_transaction_imessage_fee_coe
+    goopal::api::MethodData wallet_set_transaction_imessage_fee_coe_method_metadata{"wallet_set_transaction_imessage_fee_coe", nullptr,
+      /* description */ "Set imessage fee coefficient",
+      /* returns */ "void",
+      /* params: */ {
+        {"fee_coe", "string", goopal::api::required_positional, fc::ovariant()}
+      },
+      /* prerequisites */ (goopal::api::MethodPrerequisites) 2,
+      /* detailed description */ "Set imessage fee coefficient\n\nParameters:\n  fee_coe (string, required): fee coefficient\n\nReturns:\n  void\n",
+      /* aliases */ {"set_fee_coe"}, false};
+    store_method_metadata(wallet_set_transaction_imessage_fee_coe_method_metadata);
+  }
+
+  {
+    // register method wallet_get_transaction_imessage_fee_coe
+    goopal::api::MethodData wallet_get_transaction_imessage_fee_coe_method_metadata{"wallet_get_transaction_imessage_fee_coe", nullptr,
+      /* description */ "Get imessage fee coefficient",
+      /* returns */ "real_amount",
+      /* params: */ {},
+      /* prerequisites */ (goopal::api::MethodPrerequisites) 2,
+      /* detailed description */ "Get imessage fee coefficient\n\nParameters:\n  (none)\n\nReturns:\n  real_amount\n",
+      /* aliases */ {"get_fee_coe"}, false};
+    store_method_metadata(wallet_get_transaction_imessage_fee_coe_method_metadata);
+  }
+
+  {
+    // register method wallet_set_transaction_imessage_soft_max_length
+    goopal::api::MethodData wallet_set_transaction_imessage_soft_max_length_method_metadata{"wallet_set_transaction_imessage_soft_max_length", nullptr,
+      /* description */ "Set imessage soft max length",
+      /* returns */ "void",
+      /* params: */ {
+        {"soft_length", "amount", goopal::api::required_positional, fc::ovariant()}
+      },
+      /* prerequisites */ (goopal::api::MethodPrerequisites) 2,
+      /* detailed description */ "Set imessage soft max length\n\nParameters:\n  soft_length (amount, required): max soft length\n\nReturns:\n  void\n",
+      /* aliases */ {"set_soft_length"}, false};
+    store_method_metadata(wallet_set_transaction_imessage_soft_max_length_method_metadata);
+  }
+
+  {
+    // register method wallet_get_transaction_imessage_soft_max_length
+    goopal::api::MethodData wallet_get_transaction_imessage_soft_max_length_method_metadata{"wallet_get_transaction_imessage_soft_max_length", nullptr,
+      /* description */ "Get soft max length",
+      /* returns */ "amount",
+      /* params: */ {},
+      /* prerequisites */ (goopal::api::MethodPrerequisites) 2,
+      /* detailed description */ "Get soft max length\n\nParameters:\n  (none)\n\nReturns:\n  amount\n",
+      /* aliases */ {"get_soft_length"}, false};
+    store_method_metadata(wallet_get_transaction_imessage_soft_max_length_method_metadata);
+  }
+
+  {
     // register method wallet_set_transaction_fee
     goopal::api::MethodData wallet_set_transaction_fee_method_metadata{"wallet_set_transaction_fee", nullptr,
       /* description */ "Set the fee to add to new transactions",
       /* returns */ "asset",
       /* params: */ {
-        {"fee", "real_amount", goopal::api::required_positional, fc::ovariant()}
+        {"fee", "string", goopal::api::required_positional, fc::ovariant()}
       },
       /* prerequisites */ (goopal::api::MethodPrerequisites) 2,
-      /* detailed description */ "Set the fee to add to new transactions\n\nParameters:\n  fee (real_amount, required): the wallet transaction fee to set\n\nReturns:\n  asset\n",
+      /* detailed description */ "Set the fee to add to new transactions\n\nParameters:\n  fee (string, required): the wallet transaction fee to set\n\nReturns:\n  asset\n",
       /* aliases */ {"wallet_set_priority_fee", "set_priority_fee", "settrxfee", "setfee", "set_fee"}, false};
     store_method_metadata(wallet_set_transaction_fee_method_metadata);
   }
@@ -8098,6 +8932,58 @@ void CommonApiRpcServer::register_common_api_method_metadata()
   }
 
   {
+    // register method wallet_transfer_to_address_rpc
+    goopal::api::MethodData wallet_transfer_to_address_rpc_method_metadata{"wallet_transfer_to_address_rpc", nullptr,
+      /* description */ "Do a simple (non-TITAN) transfer to an address",
+      /* returns */ "string",
+      /* params: */ {
+        {"amount_to_transfer", "string", goopal::api::required_positional, fc::ovariant()},
+        {"asset_symbol", "asset_symbol", goopal::api::required_positional, fc::ovariant()},
+        {"from_account_name", "account_name", goopal::api::required_positional, fc::ovariant()},
+        {"to_address", "string", goopal::api::required_positional, fc::ovariant()},
+        {"memo_message", "information", goopal::api::optional_positional, fc::variant(fc::json::from_string("\"\""))},
+        {"strategy", "vote_strategy", goopal::api::optional_positional, fc::variant(fc::json::from_string("\"vote_recommended\""))}
+      },
+      /* prerequisites */ (goopal::api::MethodPrerequisites) 2,
+      /* detailed description */ "Do a simple (non-TITAN) transfer to an address\n\nParameters:\n  amount_to_transfer (string, required): the amount of shares to transfer\n  asset_symbol (asset_symbol, required): the asset to transfer\n  from_account_name (account_name, required): the source account to draw the shares from\n  to_address (string, required): the address or pubkey to transfer to\n  memo_message (information, optional, defaults to \"\"): a memo to store with the transaction\n  strategy (vote_strategy, optional, defaults to \"vote_recommended\"): enumeration [vote_none | vote_all | vote_random | vote_recommended] \n\nReturns:\n  string\n",
+      /* aliases */ {}, false};
+    store_method_metadata(wallet_transfer_to_address_rpc_method_metadata);
+  }
+
+  {
+    // register method wallet_account_balance_rpc
+    goopal::api::MethodData wallet_account_balance_rpc_method_metadata{"wallet_account_balance_rpc", nullptr,
+      /* description */ "Lists the total asset balances for the specified account",
+      /* returns */ "string",
+      /* params: */ {
+        {"account_name", "account_name", goopal::api::optional_positional, fc::variant(fc::json::from_string("\"\""))}
+      },
+      /* prerequisites */ (goopal::api::MethodPrerequisites) 2,
+      /* detailed description */ "Lists the total asset balances for the specified account\n\nParameters:\n  account_name (account_name, optional, defaults to \"\"): the account to get a balance for, or leave empty for all accounts\n\nReturns:\n  string\n",
+      /* aliases */ {}, true};
+    store_method_metadata(wallet_account_balance_rpc_method_metadata);
+  }
+
+  {
+    // register method wallet_transfer_to_public_account_rpc
+    goopal::api::MethodData wallet_transfer_to_public_account_rpc_method_metadata{"wallet_transfer_to_public_account_rpc", nullptr,
+      /* description */ "Sends given amount to the given account",
+      /* returns */ "string",
+      /* params: */ {
+        {"amount_to_transfer", "string", goopal::api::required_positional, fc::ovariant()},
+        {"asset_symbol", "asset_symbol", goopal::api::required_positional, fc::ovariant()},
+        {"from_account_name", "sending_account_name", goopal::api::required_positional, fc::ovariant()},
+        {"to_account_name", "receive_account_name", goopal::api::required_positional, fc::ovariant()},
+        {"memo_message", "information", goopal::api::optional_positional, fc::variant(fc::json::from_string("\"\""))},
+        {"strategy", "vote_strategy", goopal::api::optional_positional, fc::variant(fc::json::from_string("\"vote_recommended\""))}
+      },
+      /* prerequisites */ (goopal::api::MethodPrerequisites) 4,
+      /* detailed description */ "Sends given amount to the given account\n\nParameters:\n  amount_to_transfer (string, required): the amount of shares to transfer\n  asset_symbol (asset_symbol, required): the asset to transfer\n  from_account_name (sending_account_name, required): the source account to draw the shares from\n  to_account_name (receive_account_name, required): the account to transfer the shares to\n  memo_message (information, optional, defaults to \"\"): a memo to store with the transaction\n  strategy (vote_strategy, optional, defaults to \"vote_recommended\"): enumeration [vote_none | vote_all | vote_random | vote_recommended] \n\nReturns:\n  string\n",
+      /* aliases */ {}, false};
+    store_method_metadata(wallet_transfer_to_public_account_rpc_method_metadata);
+  }
+
+  {
     // register method about
     goopal::api::MethodData about_method_metadata{"about", nullptr,
       /* description */ "Returns version number and associated information for this client",
@@ -8357,6 +9243,8 @@ fc::variant CommonApiRpcServer::direct_invoke_positional_method(const std::strin
     return blockchain_list_pending_transactions_positional(nullptr, parameters);
   if (method_name == "blockchain_get_transaction")
     return blockchain_get_transaction_positional(nullptr, parameters);
+  if (method_name == "blockchain_get_pretty_transaction")
+    return blockchain_get_pretty_transaction_positional(nullptr, parameters);
   if (method_name == "blockchain_get_block")
     return blockchain_get_block_positional(nullptr, parameters);
   if (method_name == "blockchain_get_block_transactions")
@@ -8405,6 +9293,8 @@ fc::variant CommonApiRpcServer::direct_invoke_positional_method(const std::strin
     return blockchain_broadcast_transaction_positional(nullptr, parameters);
   if (method_name == "blockchain_btc_address_convert")
     return blockchain_btc_address_convert_positional(nullptr, parameters);
+  if (method_name == "blockchain_get_transaction_rpc")
+    return blockchain_get_transaction_rpc_positional(nullptr, parameters);
   if (method_name == "network_add_node")
     return network_add_node_positional(nullptr, parameters);
   if (method_name == "network_get_connection_count")
@@ -8427,6 +9317,8 @@ fc::variant CommonApiRpcServer::direct_invoke_positional_method(const std::strin
     return network_list_potential_peers_positional(nullptr, parameters);
   if (method_name == "network_get_upnp_info")
     return network_get_upnp_info_positional(nullptr, parameters);
+  if (method_name == "network_get_blocked_ips")
+    return network_get_blocked_ips_positional(nullptr, parameters);
   if (method_name == "debug_get_client_name")
     return debug_get_client_name_positional(nullptr, parameters);
   if (method_name == "delegate_get_config")
@@ -8435,6 +9327,10 @@ fc::variant CommonApiRpcServer::direct_invoke_positional_method(const std::strin
     return delegate_set_network_min_connection_count_positional(nullptr, parameters);
   if (method_name == "delegate_set_block_max_transaction_count")
     return delegate_set_block_max_transaction_count_positional(nullptr, parameters);
+  if (method_name == "delegate_set_soft_max_imessage_length")
+    return delegate_set_soft_max_imessage_length_positional(nullptr, parameters);
+  if (method_name == "delegate_set_imessage_fee_coe")
+    return delegate_set_imessage_fee_coe_positional(nullptr, parameters);
   if (method_name == "delegate_set_block_max_size")
     return delegate_set_block_max_size_positional(nullptr, parameters);
   if (method_name == "delegate_set_transaction_max_size")
@@ -8497,6 +9393,8 @@ fc::variant CommonApiRpcServer::direct_invoke_positional_method(const std::strin
     return wallet_account_create_positional(nullptr, parameters);
   if (method_name == "wallet_account_set_approval")
     return wallet_account_set_approval_positional(nullptr, parameters);
+  if (method_name == "wallet_get_all_approved_accounts")
+    return wallet_get_all_approved_accounts_positional(nullptr, parameters);
   if (method_name == "wallet_address_create")
     return wallet_address_create_positional(nullptr, parameters);
   if (method_name == "wallet_transfer_to_address")
@@ -8529,6 +9427,8 @@ fc::variant CommonApiRpcServer::direct_invoke_positional_method(const std::strin
     return wallet_list_unregistered_accounts_positional(nullptr, parameters);
   if (method_name == "wallet_list_my_accounts")
     return wallet_list_my_accounts_positional(nullptr, parameters);
+  if (method_name == "wallet_list_my_addresses")
+    return wallet_list_my_addresses_positional(nullptr, parameters);
   if (method_name == "wallet_get_account")
     return wallet_get_account_positional(nullptr, parameters);
   if (method_name == "wallet_get_account_public_address")
@@ -8553,8 +9453,18 @@ fc::variant CommonApiRpcServer::direct_invoke_positional_method(const std::strin
     return wallet_delegate_withdraw_pay_positional(nullptr, parameters);
   if (method_name == "wallet_delegate_pay_balance_query")
     return wallet_delegate_pay_balance_query_positional(nullptr, parameters);
+  if (method_name == "wallet_active_delegate_salary")
+    return wallet_active_delegate_salary_positional(nullptr, parameters);
   if (method_name == "wallet_get_delegate_statue")
     return wallet_get_delegate_statue_positional(nullptr, parameters);
+  if (method_name == "wallet_set_transaction_imessage_fee_coe")
+    return wallet_set_transaction_imessage_fee_coe_positional(nullptr, parameters);
+  if (method_name == "wallet_get_transaction_imessage_fee_coe")
+    return wallet_get_transaction_imessage_fee_coe_positional(nullptr, parameters);
+  if (method_name == "wallet_set_transaction_imessage_soft_max_length")
+    return wallet_set_transaction_imessage_soft_max_length_positional(nullptr, parameters);
+  if (method_name == "wallet_get_transaction_imessage_soft_max_length")
+    return wallet_get_transaction_imessage_soft_max_length_positional(nullptr, parameters);
   if (method_name == "wallet_set_transaction_fee")
     return wallet_set_transaction_fee_positional(nullptr, parameters);
   if (method_name == "wallet_get_transaction_fee")
@@ -8601,6 +9511,12 @@ fc::variant CommonApiRpcServer::direct_invoke_positional_method(const std::strin
     return wallet_account_retract_positional(nullptr, parameters);
   if (method_name == "wallet_account_delete")
     return wallet_account_delete_positional(nullptr, parameters);
+  if (method_name == "wallet_transfer_to_address_rpc")
+    return wallet_transfer_to_address_rpc_positional(nullptr, parameters);
+  if (method_name == "wallet_account_balance_rpc")
+    return wallet_account_balance_rpc_positional(nullptr, parameters);
+  if (method_name == "wallet_transfer_to_public_account_rpc")
+    return wallet_transfer_to_public_account_rpc_positional(nullptr, parameters);
   if (method_name == "about")
     return about_positional(nullptr, parameters);
   if (method_name == "get_info")

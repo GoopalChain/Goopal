@@ -2,9 +2,11 @@
 #include <cli/PrintResult.hpp>
 #include <rpc/RpcServer.hpp>
 #include <wallet/Url.hpp>
+#include <cli/locale.hpp>
 
 #include <boost/range/algorithm/max_element.hpp>
 #include <boost/range/algorithm/min_element.hpp>
+
 
 namespace goopal { namespace cli {
 

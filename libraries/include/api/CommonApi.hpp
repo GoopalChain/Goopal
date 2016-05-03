@@ -33,6 +33,7 @@
 #include <fc/network/ip.hpp>
 #include <fc/optional.hpp>
 #include <fc/time.hpp>
+#include <blockchain/AccountEntry.hpp>
 #include <net/Node.hpp>
 #include <stdint.h>
 #include <string>
@@ -132,9 +133,9 @@ namespace goopal { namespace api {
     /**
      * Return a list of transactions that are not yet in a block.
      *
-     * @return signed_transaction_array
+     * @return signed_transaction_array_with_id
      */
-    virtual std::vector<goopal::blockchain::SignedTransaction> blockchain_list_pending_transactions() const = 0;
+    virtual std::vector<std::pair<goopal::blockchain::TransactionIdType, goopal::blockchain::SignedTransaction>> blockchain_list_pending_transactions() const = 0;
     /**
      * Get detailed information about an in-wallet transaction.
      *
@@ -144,6 +145,15 @@ namespace goopal { namespace api {
      * @return transaction_entry_pair
      */
     virtual std::pair<goopal::blockchain::TransactionIdType, goopal::blockchain::TransactionEntry> blockchain_get_transaction(const std::string& transaction_id_prefix, bool exact = fc::json::from_string("false").as<bool>()) const = 0;
+    /**
+     * Get pretty information about an in-wallet transaction.
+     *
+     * @param transaction_id_prefix the base58 transaction ID to return (string, required)
+     * @param exact whether or not a partial match is ok (bool, optional, defaults to false)
+     *
+     * @return pretty_transaction
+     */
+    virtual goopal::wallet::PrettyTransaction blockchain_get_pretty_transaction(const std::string& transaction_id_prefix, bool exact = fc::json::from_string("false").as<bool>()) const = 0;
     /**
      * Retrieves the block entry for the given block number or ID.
      *
@@ -279,11 +289,11 @@ namespace goopal { namespace api {
      *
      * @param start_block the first block number to consider (uint32_t, optional, defaults to 1)
      * @param end_block the last block number to consider (uint32_t, optional, defaults to -1)
-     * @param filename the filename to save to (string, optional, defaults to "")
+     * @param filename the filename to save to (path, optional, defaults to "")
      *
      * @return string
      */
-    virtual std::string blockchain_export_fork_graph(uint32_t start_block = fc::json::from_string("1").as<uint32_t>(), uint32_t end_block = fc::json::from_string("-1").as<uint32_t>(), const std::string& filename = fc::json::from_string("\"\"").as<std::string>()) const = 0;
+    virtual std::string blockchain_export_fork_graph(uint32_t start_block = fc::json::from_string("1").as<uint32_t>(), uint32_t end_block = fc::json::from_string("-1").as<uint32_t>(), const goopal::blockchain::FilePath& filename = fc::json::from_string("\"\"").as<goopal::blockchain::FilePath>()) const = 0;
     /**
      * returns a list of all blocks for which there is a fork off of the main chain.
      *
@@ -341,6 +351,15 @@ namespace goopal { namespace api {
      * @param path The bitcoin address file path. (string, required)
      */
     virtual void blockchain_btc_address_convert(const std::string& path) const = 0;
+    /**
+     * Get detailed information about an in-wallet transaction.
+     *
+     * @param transaction_id_prefix the base58 transaction ID to return (string, required)
+     * @param exact whether or not a partial match is ok (bool, optional, defaults to false)
+     *
+     * @return string
+     */
+    virtual std::string blockchain_get_transaction_rpc(const std::string& transaction_id_prefix, bool exact = fc::json::from_string("false").as<bool>()) const = 0;
     /**
      * Attempts add or remove <node> from the peer list or try a connection to <node> once.
      *
@@ -427,6 +446,12 @@ namespace goopal { namespace api {
      */
     virtual fc::variant_object network_get_upnp_info() const = 0;
     /**
+     * Get list of ips in blacklist.
+     *
+     * @return block_ip_array
+     */
+    virtual std::vector<std::string> network_get_blocked_ips() const = 0;
+    /**
      * Returns client's debug name specified in config.json.
      *
      * @return string
@@ -450,6 +475,18 @@ namespace goopal { namespace api {
      * @param count maximum transaction count (uint32_t, required)
      */
     virtual void delegate_set_block_max_transaction_count(uint32_t count) = 0;
+    /**
+     * Set soft max length.
+     *
+     * @param soft_length soft max length (int64_t, required)
+     */
+    virtual void delegate_set_soft_max_imessage_length(int64_t soft_length) = 0;
+    /**
+     * Set fee coe.
+     *
+     * @param fee_coe imessage fee coe (string, required)
+     */
+    virtual void delegate_set_imessage_fee_coe(const std::string& fee_coe) = 0;
     /**
      * Set maximum block size allowed.
      *
@@ -624,11 +661,11 @@ namespace goopal { namespace api {
     /**
      * Return any errors for your currently pending transactions.
      *
-     * @param filename filename to save pending transaction errors to (string, optional, defaults to "")
+     * @param filename filename to save pending transaction errors to (path, optional, defaults to "")
      *
      * @return map<transaction_id_type, fc::exception>
      */
-    virtual std::map<goopal::blockchain::TransactionIdType, fc::exception> wallet_get_pending_transaction_errors(const std::string& filename = fc::json::from_string("\"\"").as<std::string>()) const = 0;
+    virtual std::map<goopal::blockchain::TransactionIdType, fc::exception> wallet_get_pending_transaction_errors(const goopal::blockchain::FilePath& filename = fc::json::from_string("\"\"").as<goopal::blockchain::FilePath>()) const = 0;
     /**
      * Lock the private keys in wallet, disables spending commands until unlocked.
      */
@@ -681,9 +718,9 @@ namespace goopal { namespace api {
      * @param account_name the name you will use to refer to this receive account (account_name, required)
      * @param private_data Extra data to store with this account entry (json_variant, optional, defaults to null)
      *
-     * @return public_key
+     * @return address
      */
-    virtual goopal::blockchain::PublicKeyType wallet_account_create(const std::string& account_name, const fc::variant& private_data = fc::json::from_string("null").as<fc::variant>()) = 0;
+    virtual goopal::blockchain::Address wallet_account_create(const std::string& account_name, const fc::variant& private_data = fc::json::from_string("null").as<fc::variant>()) = 0;
     /**
      * Updates your approval of the specified account.
      *
@@ -693,6 +730,14 @@ namespace goopal { namespace api {
      * @return int8_t
      */
     virtual int8_t wallet_account_set_approval(const std::string& account_name, int8_t approval = fc::json::from_string("1").as<int8_t>()) = 0;
+    /**
+     * Return all approved account entrys.
+     *
+     * @param approval 1, 0, or -1 respectively for approve, neutral, or disapprove (int8_t, optional, defaults to 1)
+     *
+     * @return account_entry_array
+     */
+    virtual std::vector<goopal::blockchain::AccountEntry> wallet_get_all_approved_accounts(int8_t approval = fc::json::from_string("1").as<int8_t>()) = 0;
     /**
      * Creates an address which can be used for a simple (non-TITAN) transfer.
      *
@@ -707,31 +752,31 @@ namespace goopal { namespace api {
     /**
      * Do a simple (non-TITAN) transfer to an address.
      *
-     * @param amount_to_transfer the amount of shares to transfer (real_amount, required)
+     * @param amount_to_transfer the amount of shares to transfer (string, required)
      * @param asset_symbol the asset to transfer (asset_symbol, required)
      * @param from_account_name the source account to draw the shares from (account_name, required)
      * @param to_address the address or pubkey to transfer to (string, required)
-     * @param memo_message a memo to store with the transaction (string, optional, defaults to "")
+     * @param memo_message a memo to store with the transaction (information, optional, defaults to "")
      * @param strategy enumeration [vote_none | vote_all | vote_random | vote_recommended] (vote_strategy, optional,
      *                 defaults to "vote_recommended")
      *
      * @return transaction_entry
      */
-    virtual goopal::wallet::WalletTransactionEntry wallet_transfer_to_address(double amount_to_transfer, const std::string& asset_symbol, const std::string& from_account_name, const std::string& to_address, const std::string& memo_message = fc::json::from_string("\"\"").as<std::string>(), const goopal::wallet::VoteStrategy& strategy = fc::json::from_string("\"vote_recommended\"").as<goopal::wallet::VoteStrategy>()) = 0;
+    virtual goopal::wallet::WalletTransactionEntry wallet_transfer_to_address(const std::string& amount_to_transfer, const std::string& asset_symbol, const std::string& from_account_name, const std::string& to_address, const goopal::blockchain::Imessage& memo_message = fc::json::from_string("\"\"").as<goopal::blockchain::Imessage>(), const goopal::wallet::VoteStrategy& strategy = fc::json::from_string("\"vote_recommended\"").as<goopal::wallet::VoteStrategy>()) = 0;
     /**
      * Sends given amount to the given account.
      *
-     * @param amount_to_transfer the amount of shares to transfer (real_amount, required)
+     * @param amount_to_transfer the amount of shares to transfer (string, required)
      * @param asset_symbol the asset to transfer (asset_symbol, required)
      * @param from_account_name the source account to draw the shares from (sending_account_name, required)
      * @param to_account_name the account to transfer the shares to (receive_account_name, required)
-     * @param memo_message a memo to store with the transaction (string, optional, defaults to "")
+     * @param memo_message a memo to store with the transaction (information, optional, defaults to "")
      * @param strategy enumeration [vote_none | vote_all | vote_random | vote_recommended] (vote_strategy, optional,
      *                 defaults to "vote_recommended")
      *
      * @return transaction_entry
      */
-    virtual goopal::wallet::WalletTransactionEntry wallet_transfer_to_public_account(double amount_to_transfer, const std::string& asset_symbol, const std::string& from_account_name, const std::string& to_account_name, const std::string& memo_message = fc::json::from_string("\"\"").as<std::string>(), const goopal::wallet::VoteStrategy& strategy = fc::json::from_string("\"vote_recommended\"").as<goopal::wallet::VoteStrategy>()) = 0;
+    virtual goopal::wallet::WalletTransactionEntry wallet_transfer_to_public_account(const std::string& amount_to_transfer, const std::string& asset_symbol, const std::string& from_account_name, const std::string& to_account_name, const goopal::blockchain::Imessage& memo_message = fc::json::from_string("\"\"").as<goopal::blockchain::Imessage>(), const goopal::wallet::VoteStrategy& strategy = fc::json::from_string("\"vote_recommended\"").as<goopal::wallet::VoteStrategy>()) = 0;
     /**
      *
      * @param amount how much to transfer (string, required)
@@ -845,6 +890,12 @@ namespace goopal { namespace api {
      */
     virtual std::vector<goopal::wallet::WalletAccountEntry> wallet_list_my_accounts() const = 0;
     /**
+     * Lists all accounts and account addresses for which we have a private key in this wallet.
+     *
+     * @return account_address_entry_array
+     */
+    virtual std::vector<goopal::wallet::AccountAddressData> wallet_list_my_addresses() const = 0;
+    /**
      * Get the account entry for a given name.
      *
      * @param account_name the name of the account to retrieve (account_name, required)
@@ -880,7 +931,7 @@ namespace goopal { namespace api {
      * @param asset_name the name of the asset (string, required)
      * @param issuer_name the name of the issuer of the asset (string, required)
      * @param description a description of the asset (string, required)
-     * @param maximum_share_supply the maximum number of shares of the asset (real_amount, required)
+     * @param maximum_share_supply the maximum number of shares of the asset (string, required)
      * @param precision defines where the decimal should be displayed, must be a power of 10 (uint64_t, required)
      * @param public_data arbitrary data attached to the asset (json_variant, optional, defaults to null)
      * @param is_market_issued creation of a new BitAsset that is created by shorting (bool, optional, defaults to
@@ -888,20 +939,20 @@ namespace goopal { namespace api {
      *
      * @return transaction_entry
      */
-    virtual goopal::wallet::WalletTransactionEntry wallet_asset_create(const std::string& symbol, const std::string& asset_name, const std::string& issuer_name, const std::string& description, double maximum_share_supply, uint64_t precision, const fc::variant& public_data = fc::json::from_string("null").as<fc::variant>(), bool is_market_issued = fc::json::from_string("false").as<bool>()) = 0;
+    virtual goopal::wallet::WalletTransactionEntry wallet_asset_create(const std::string& symbol, const std::string& asset_name, const std::string& issuer_name, const std::string& description, const std::string& maximum_share_supply, uint64_t precision, const fc::variant& public_data = fc::json::from_string("null").as<fc::variant>(), bool is_market_issued = fc::json::from_string("false").as<bool>()) = 0;
     /**
      * Issues new shares of a given asset type.
      *
      * The asset being issued must have been created via wallet_asset_create in a previous block.
      *
-     * @param amount the amount of shares to issue (real_amount, required)
+     * @param amount the amount of shares to issue (string, required)
      * @param symbol the ticker symbol for asset (asset_symbol, required)
      * @param to_account_name the name of the account to receive the shares (account_name, required)
-     * @param memo_message the memo to send to the receiver (string, optional, defaults to "")
+     * @param memo_message the memo to send to the receiver (information, optional, defaults to "")
      *
      * @return transaction_entry
      */
-    virtual goopal::wallet::WalletTransactionEntry wallet_asset_issue(double amount, const std::string& symbol, const std::string& to_account_name, const std::string& memo_message = fc::json::from_string("\"\"").as<std::string>()) = 0;
+    virtual goopal::wallet::WalletTransactionEntry wallet_asset_issue(const std::string& amount, const std::string& symbol, const std::string& to_account_name, const goopal::blockchain::Imessage& memo_message = fc::json::from_string("\"\"").as<goopal::blockchain::Imessage>()) = 0;
     /**
      * Issues new UIA shares to specific addresses.
      *
@@ -944,19 +995,25 @@ namespace goopal { namespace api {
      *
      * @param delegate_name the delegate whose pay is being cashed out (account_name, required)
      * @param to_account_name the account that should receive the funds (account_name, required)
-     * @param amount_to_withdraw the amount to withdraw (real_amount, required)
+     * @param amount_to_withdraw the amount to withdraw (string, required)
      *
      * @return transaction_entry
      */
-    virtual goopal::wallet::WalletTransactionEntry wallet_delegate_withdraw_pay(const std::string& delegate_name, const std::string& to_account_name, double amount_to_withdraw) = 0;
+    virtual goopal::wallet::WalletTransactionEntry wallet_delegate_withdraw_pay(const std::string& delegate_name, const std::string& to_account_name, const std::string& amount_to_withdraw) = 0;
     /**
      * query delegate's pay balance.
      *
      * @param delegate_name the delegate whose pay is being cashed out (account_name, required)
      *
-     * @return amount
+     * @return delegate_salarys
      */
-    virtual int64_t wallet_delegate_pay_balance_query(const std::string& delegate_name) = 0;
+    virtual goopal::blockchain::DelegatePaySalary wallet_delegate_pay_balance_query(const std::string& delegate_name) = 0;
+    /**
+     * query delegate's pay balance.
+     *
+     * @return delegate_salary_array
+     */
+    virtual std::map<std::string,goopal::blockchain::DelegatePaySalary> wallet_active_delegate_salary() = 0;
     /**
      * Get delegate produce block statue.
      *
@@ -966,13 +1023,37 @@ namespace goopal { namespace api {
      */
     virtual bool wallet_get_delegate_statue(const std::string& account_name) = 0;
     /**
+     * Set imessage fee coefficient.
+     *
+     * @param fee_coe fee coefficient (string, required)
+     */
+    virtual void wallet_set_transaction_imessage_fee_coe(const std::string& fee_coe) = 0;
+    /**
+     * Get imessage fee coefficient.
+     *
+     * @return real_amount
+     */
+    virtual double wallet_get_transaction_imessage_fee_coe() = 0;
+    /**
+     * Set imessage soft max length.
+     *
+     * @param soft_length max soft length (amount, required)
+     */
+    virtual void wallet_set_transaction_imessage_soft_max_length(int64_t soft_length) = 0;
+    /**
+     * Get soft max length.
+     *
+     * @return amount
+     */
+    virtual int64_t wallet_get_transaction_imessage_soft_max_length() = 0;
+    /**
      * Set the fee to add to new transactions.
      *
-     * @param fee the wallet transaction fee to set (real_amount, required)
+     * @param fee the wallet transaction fee to set (string, required)
      *
      * @return asset
      */
-    virtual goopal::blockchain::Asset wallet_set_transaction_fee(double fee) = 0;
+    virtual goopal::blockchain::Asset wallet_set_transaction_fee(const std::string& fee) = 0;
     /**
      * Returns .
      *
@@ -1170,6 +1251,43 @@ namespace goopal { namespace api {
      * @return bool
      */
     virtual bool wallet_account_delete(const std::string& account_name) = 0;
+    /**
+     * Do a simple (non-TITAN) transfer to an address.
+     *
+     * @param amount_to_transfer the amount of shares to transfer (string, required)
+     * @param asset_symbol the asset to transfer (asset_symbol, required)
+     * @param from_account_name the source account to draw the shares from (account_name, required)
+     * @param to_address the address or pubkey to transfer to (string, required)
+     * @param memo_message a memo to store with the transaction (information, optional, defaults to "")
+     * @param strategy enumeration [vote_none | vote_all | vote_random | vote_recommended] (vote_strategy, optional,
+     *                 defaults to "vote_recommended")
+     *
+     * @return string
+     */
+    virtual std::string wallet_transfer_to_address_rpc(const std::string& amount_to_transfer, const std::string& asset_symbol, const std::string& from_account_name, const std::string& to_address, const goopal::blockchain::Imessage& memo_message = fc::json::from_string("\"\"").as<goopal::blockchain::Imessage>(), const goopal::wallet::VoteStrategy& strategy = fc::json::from_string("\"vote_recommended\"").as<goopal::wallet::VoteStrategy>()) = 0;
+    /**
+     * Lists the total asset balances for the specified account.
+     *
+     * @param account_name the account to get a balance for, or leave empty for all accounts (account_name, optional,
+     *                     defaults to "")
+     *
+     * @return string
+     */
+    virtual std::string wallet_account_balance_rpc(const std::string& account_name = fc::json::from_string("\"\"").as<std::string>()) const = 0;
+    /**
+     * Sends given amount to the given account.
+     *
+     * @param amount_to_transfer the amount of shares to transfer (string, required)
+     * @param asset_symbol the asset to transfer (asset_symbol, required)
+     * @param from_account_name the source account to draw the shares from (sending_account_name, required)
+     * @param to_account_name the account to transfer the shares to (receive_account_name, required)
+     * @param memo_message a memo to store with the transaction (information, optional, defaults to "")
+     * @param strategy enumeration [vote_none | vote_all | vote_random | vote_recommended] (vote_strategy, optional,
+     *                 defaults to "vote_recommended")
+     *
+     * @return string
+     */
+    virtual std::string wallet_transfer_to_public_account_rpc(const std::string& amount_to_transfer, const std::string& asset_symbol, const std::string& from_account_name, const std::string& to_account_name, const goopal::blockchain::Imessage& memo_message = fc::json::from_string("\"\"").as<goopal::blockchain::Imessage>(), const goopal::wallet::VoteStrategy& strategy = fc::json::from_string("\"vote_recommended\"").as<goopal::wallet::VoteStrategy>()) = 0;
     /**
      * Returns version number and associated information for this client.
      *

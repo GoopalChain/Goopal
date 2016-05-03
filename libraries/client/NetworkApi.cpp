@@ -44,8 +44,33 @@ void detail::ClientImpl::network_add_node(const string& node, const string& comm
 {
    if (command == "add")
       _self->connect_to_peer(node);
-   else
+   else if (command == "block")
+   {
+       std::basic_string <char> ip;
+       int pos;
+       if ((pos = node.find(':')) != std::string::npos)
+       { 
+           _p2p_node->block_node(node.substr(0, pos).c_str(), true);
+           _p2p_node->add_node(fc::ip::endpoint::from_string(node),-1);
+       }
+       else
+       {
+	       _p2p_node->block_node(node, true);
+	       _p2p_node->add_node(fc::ip::endpoint::from_string(node + ":0"), -1);
+       }
+   }
+   else if (command == "unblock")
+   {
+       std::basic_string <char> ip;
+       int pos;
+       if ((pos = node.find(':')) != std::string::npos)
+           _p2p_node->block_node(node.substr(0, pos).c_str(), false);
+       else
+           _p2p_node->block_node(node, false);
+   }else
+   {
       FC_THROW_EXCEPTION(fc::invalid_arg_exception, "unsupported command argument \"${command}\", valid commands are: \"add\"", ("command", command));
+   }
 }
 
 uint32_t detail::ClientImpl::network_get_connection_count() const
@@ -93,6 +118,11 @@ fc::variant_object ClientImpl::network_get_upnp_info()const
    }
 
    return upnp_info;
+}
+
+std::vector<std::string> ClientImpl::network_get_blocked_ips()const
+{
+    return _p2p_node->get_blocked_ips();
 }
 
 } } } // namespace goopal::client::detail

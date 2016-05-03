@@ -155,7 +155,11 @@ class AccountDbInterface
    virtual void account_erase_from_address_map( const Address& ) = 0;
    virtual void account_erase_from_vote_set( const VoteDel& ) = 0;
 };
-
+struct DelegatePaySalary
+{
+    ShareType total_balance;
+    ShareType pay_balance;
+};
 } } // goopal::blockchain
 
 FC_REFLECT_ENUM( goopal::blockchain::AccountType,
@@ -198,3 +202,4 @@ FC_REFLECT( goopal::blockchain::AccountEntry,
             (delegate_info)
             (meta_data)
             )
+            FC_REFLECT(goopal::blockchain::DelegatePaySalary, (total_balance)(pay_balance))

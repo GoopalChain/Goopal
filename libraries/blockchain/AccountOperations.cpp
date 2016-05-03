@@ -159,7 +159,6 @@ namespace goopal { namespace blockchain {
 
       eval_state._current_state->store_account_entry( *account );
    } FC_CAPTURE_AND_RETHROW( (*this) ) }
-
    void UpdateSigningKeyOperation::evaluate( TransactionEvaluationState& eval_state )const
    { try {
       oAccountEntry account_rec = eval_state._current_state->get_account_entry( this->account_id );

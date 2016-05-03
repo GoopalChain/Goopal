@@ -227,12 +227,14 @@ namespace goopal { namespace wallet {
          * @return void
          */
          void                   set_last_scanned_block_number( uint32_t block_num );
+		 void					set_last_scanned_block_number_for_gop(uint32_t block_num);
          /**  
          * Get wallet property of last scanned block number.
          *
          * @return uint32_t
          */
          uint32_t               get_last_scanned_block_number()const;
+		 uint32_t				get_last_scanned_block_number_for_gop()const;
 
          /**  
          * Set wallet property of every transaction's fee
@@ -250,6 +252,7 @@ namespace goopal { namespace wallet {
          * @return Asset
          */
          Asset                  get_transaction_fee( const AssetIdType desired_fee_asset_id = 0 )const;
+         Asset                  get_transaction_imessage_fee(const std::string & imessage = "")const;
          /**  
          * Whether the fees of the specified assets can be paid with specified assets
          *
@@ -273,7 +276,10 @@ namespace goopal { namespace wallet {
          * @return uint32_t
          */
          uint32_t               get_transaction_expiration()const;
-
+         void set_transaction_imessage_fee_coe(const ImessageIdType& coe);
+         ImessageIdType get_transaction_imessage_fee_coe()const;
+         void set_transaction_imessage_soft_max_length(const ImessageLengthIdType& length);
+         ImessageLengthIdType get_transaction_imessage_soft_max_length()const;
          /**  
          * Get scan process count
          *
@@ -729,6 +735,12 @@ namespace goopal { namespace wallet {
          * @return vector<WalletAccountEntry>
          */
          vector<WalletAccountEntry> list_my_accounts()const;
+         /**
+         * List all my accounts and account's address in current wallet.
+         *
+         * @return vector<WalletAccountEntry>
+         */
+         vector<AccountAddressData> list_addresses() const;
 
          /**  
          * Import private key into current wallet. If the account has been registered in the chain is not used to enter the name
@@ -894,7 +906,7 @@ namespace goopal { namespace wallet {
          * @return WalletTransactionEntry
          */
          WalletTransactionEntry transfer_asset_to_address(
-                 double real_amount_to_transfer,
+                 const string& real_amount_to_transfer,
                  const string& amount_to_transfer_symbol,
                  const string& from_account_name,
                  const Address& to_address,
@@ -1015,7 +1027,7 @@ namespace goopal { namespace wallet {
          */
          WalletTransactionEntry withdraw_delegate_pay(
                  const string& delegate_name,
-                 double amount_to_withdraw,
+                 const string& amount_to_withdraw,
                  const string& withdraw_to_account_name,
                  bool sign
                  );
@@ -1026,8 +1038,11 @@ namespace goopal { namespace wallet {
          *
          * @return ShareType
          */
-		 ShareType query_delegate_salary(
+         DelegatePaySalary query_delegate_salary(
 			 const string& delegate_name);
+
+
+         std::map<std::string, goopal::blockchain::DelegatePaySalary> query_delegate_salarys();
 
          /**  
          * The balance of all the money designated to vote again according to the voter_address
@@ -1140,7 +1155,7 @@ namespace goopal { namespace wallet {
                  const string& description,
                  const variant& data,
                  const string& issuer_name,
-                 double max_share_supply,
+                 const string& max_share_supply,
                  uint64_t precision,
                  bool is_market_issued,
                  bool sign
@@ -1193,7 +1208,7 @@ namespace goopal { namespace wallet {
          * @return WalletTransactionEntry
          */
          WalletTransactionEntry issue_asset(
-                 double amount,
+				 const string& amount,
                  const string& symbol,
                  const string& to_account_name,
                  const string& memo_message,
@@ -1224,7 +1239,18 @@ namespace goopal { namespace wallet {
          * @return string
          */
          string                             get_key_label( const PublicKeyType& key )const;
-         PrettyTransaction                 to_pretty_trx( const WalletTransactionEntry& trx_rec ) const;
+         PrettyTransaction                  to_pretty_trx( const WalletTransactionEntry& trx_rec ) const;
+
+
+         /**
+         * Formatted transactions to pretty transaction.
+         *
+         * @param  trx_entry  transaction entry
+         * @param  addr_for_fee for calculation fees. IF it is "" then no change.
+         *
+         * @return string
+         */
+		 PrettyTransaction				    to_pretty_trx(const goopal::blockchain::TransactionEntry& trx_entry, const std::string addr_for_fee) const;
 
          /**
          * Updates your approval of the specified account.
@@ -1235,13 +1261,21 @@ namespace goopal { namespace wallet {
          * @return int8_t
          */
          void                               set_account_approval( const string& account_name, int8_t approval );
-         /**
-         * clear all account approval.
-         *
-         * @param account_name nothing to effect
-         *
-         * @return void
-         */
+		 /**
+		 * Get all approved accounts.
+		 *
+		 * @param approval 1 0 -1 According to the value to get the corresponding account entry
+		 *
+		 * @return void
+		 */
+		 vector<AccountEntry>				get_all_approved_accounts(const int8_t approval);
+		 /**
+		 * clear all account approval.
+		 *
+		 * @param account_name nothing to effect
+		 *
+		 * @return void
+		 */
 		 void								clear_account_approval(const string& account_name);
          /**
          * Get your approval of the specified account.

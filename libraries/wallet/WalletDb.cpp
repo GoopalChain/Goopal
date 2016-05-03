@@ -232,7 +232,44 @@ namespace goopal { namespace wallet {
       int32_t next_rec_number = 2;
       if( next_rec_num.is_null() )
       {
-         next_rec_number = 2;
+          bool getoldnum = false;
+          for (auto iter = my->_entrys.begin(); iter.valid(); ++iter)
+          {
+              GenericWalletEntry entry = iter.value();
+              if (entry.type == property_entry_type)
+              {
+                  if ((entry.data.is_object()) && (entry.data.get_object().contains("key")))
+                  {
+                      if (entry.data.get_object()["key"].as<string>() == "next_record_number")
+                      {
+                          next_rec_number = entry.data.get_object()["value"].as<int32_t>();
+                          ilog("im in the old movie\n");
+                          getoldnum = true;
+                          for (auto iter = my->_entrys.begin(); iter.valid();)
+                          {
+                              GenericWalletEntry entry = iter.value();
+                              if (entry.type == transaction_entry_type)
+                              {
+                                  auto key = iter.key();
+                                  ++iter;
+                                  my->_entrys.remove(key);
+                               
+                                  
+                              }
+                              else
+                                  ++iter;
+                          }
+                          transactions.clear();
+                          id_to_transaction_entry_index.clear();
+                          break;
+                      }
+                  }
+              }
+          }
+          if (!getoldnum)
+          {
+              next_rec_number = 2;
+          }
       }
       else
       {

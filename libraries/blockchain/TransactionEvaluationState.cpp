@@ -8,7 +8,8 @@
 namespace goopal { namespace blockchain {
 
    TransactionEvaluationState::TransactionEvaluationState( PendingChainState* current_state )
-   :_current_state( current_state )
+   :_current_state( current_state ),
+   imessage_length(0)
    {
    }
 

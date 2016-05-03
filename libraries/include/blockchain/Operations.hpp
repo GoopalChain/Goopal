@@ -49,6 +49,8 @@ namespace goopal { namespace blockchain {
 
       // assets
       update_asset_ext_op_type      = 30,
+      //memo
+      imessage_memo_op_type = 66
    };
 
    /**
@@ -120,6 +122,7 @@ FC_REFLECT_ENUM( goopal::blockchain::OperationTypeEnum,
                  (update_signing_key_op_type)
                  (update_balance_vote_op_type)
                  (update_asset_ext_op_type)
+				 (imessage_memo_op_type)
                  )
 
 FC_REFLECT( goopal::blockchain::Operation, (type)(data) )

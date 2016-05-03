@@ -6,7 +6,7 @@
 #include <wallet/WalletImpl.hpp>
 
 #include <blockchain/Time.hpp>
-
+#include <blockchain/ImessageOperations.hpp>
 #include <sstream>
 
 using namespace goopal::wallet;
@@ -109,7 +109,10 @@ WalletTransactionEntry WalletImpl::scan_transaction(
         transaction_entry->received_time = block_timestamp;
         transaction_entry->trx = transaction;
     }
-
+    if (already_exists && overwrite_existing)
+    {
+        transaction_entry->ledger_entries.clear();
+    }
     bool new_transaction = !transaction_entry->is_confirmed;
 
     transaction_entry->block_num = block_num;
@@ -187,17 +190,17 @@ WalletTransactionEntry WalletImpl::scan_transaction(
     transaction_entry->fee = total_fee;
 
     /* When the only withdrawal for asset 0 is the fee (bids) */
-    if( transaction_entry->ledger_entries.size() > 1 )
-    {
-        const auto entries = transaction_entry->ledger_entries;
-        transaction_entry->ledger_entries.clear();
-        for( const auto& entry : entries )
-        {
-            if( entry.amount != transaction_entry->fee )
-                transaction_entry->ledger_entries.push_back( entry );
-        }
-
-    }
+//     if( transaction_entry->ledger_entries.size() > 1 )
+//     {
+//         const auto entries = transaction_entry->ledger_entries;
+//         transaction_entry->ledger_entries.clear();
+//         for( const auto& entry : entries )
+//         {
+//             if( entry.amount != transaction_entry->fee )
+//                 transaction_entry->ledger_entries.push_back( entry );
+//         }
+// 
+//     }
 
     for( const auto& op : transaction.operations )
     {
@@ -271,16 +274,56 @@ WalletTransactionEntry WalletImpl::scan_transaction(
 			string strToAccount;
 			string strSubAccount;
 			self->accountsplit(transaction.gop_account, strToAccount, strSubAccount);
-			//gop_entry.from_account = transaction.from_account;
-			gop_entry.create_time = transaction_entry->created_time;
-			gop_entry.gop_account = transaction.gop_account;
-			gop_entry.block_num = transaction_entry->block_num;
-			transaction_entry->trx.gop_account = transaction.gop_account;
-			transaction_entry->trx.gop_inport_asset = transaction.gop_inport_asset;
-			gop_entry.trx_id = transaction.id();
-			gop_entry.asset_trx = transaction.gop_inport_asset;
-			_blockchain->transaction_insert_to_gop_full_entry(strToAccount, gop_entry);
-			//_blockchain->transaction_insert_to_gop_balance(gop_entry.gop_account, gop_entry);
+			auto blockchain_trx = _blockchain->get_transaction(transaction_id);
+			bool bDiffDeop = false;
+			if (blockchain_trx.valid())
+			{
+				ShareType gop_amount = 0;
+				string preowner;
+				int iLoop = 0;
+				for (const auto& op : blockchain_trx->trx.operations)
+				{
+					switch (op.type)
+					{
+					case deposit_op_type:
+						auto deop = op.as<DepositOperation>();
+						if (0 == iLoop)
+						{
+							preowner = string(*(deop.condition.owner()));
+							gop_amount += deop.amount;
+						}
+						else
+						{
+							if (preowner == string(*(deop.condition.owner())))
+							{
+								gop_amount += deop.amount;
+							}
+							else
+							{
+								gop_amount = 0;
+								bDiffDeop = true;
+							}
+						}
+						++iLoop;
+						break;
+					}
+					if (bDiffDeop)
+					{
+						break;
+					}
+				}
+				//gop_entry.from_account = transaction.from_account;
+				gop_entry.create_time = transaction_entry->created_time;
+				gop_entry.gop_account = transaction.gop_account;
+				gop_entry.block_num = transaction_entry->block_num;
+				transaction_entry->trx.gop_account = transaction.gop_account;
+				transaction_entry->trx.gop_inport_asset = transaction.gop_inport_asset;
+				gop_entry.trx_id = transaction.id();
+				//gop_entry.asset_trx = transaction.gop_inport_asset;
+				gop_entry.asset_trx = Asset(gop_amount, 0);
+				_blockchain->transaction_insert_to_gop_full_entry(strToAccount, gop_entry);
+				//_blockchain->transaction_insert_to_gop_balance(gop_entry.gop_account, gop_entry);
+			}
 		}
 	}
 
@@ -1334,7 +1377,44 @@ vector<PrettyTransaction> Wallet::get_pretty_transaction_history( const string& 
             }
         }
     }
-
+    for (auto& entrys : pretties)
+    {
+        vector<PrettyLedgerEntry>::iterator iter = entrys.ledger_entries.begin();
+        string memoTemp;
+        for (; iter != entrys.ledger_entries.end();)
+        {
+            if (iter->amount == Asset(0,0) && entrys.ledger_entries.size() != 1)
+            {
+                if (iter->memo != "")
+                {
+                    memoTemp = iter->memo;
+                }
+                iter = entrys.ledger_entries.erase(iter);
+                continue;
+            }
+            if (Address::is_valid(iter->from_account))
+            {
+                auto account_rec = my->_blockchain->get_account_by_address(iter->from_account);
+                if (account_rec.valid())
+                {
+                    iter->from_account = account_rec->name;
+                }
+            }
+            if (Address::is_valid(iter->to_account))
+            {
+                auto account_rec_toaccount = my->_blockchain->get_account_by_address(iter->to_account);
+                if (account_rec_toaccount.valid())
+                {
+                    iter->to_account = account_rec_toaccount->name;
+                }
+            }
+            if (memoTemp != "")
+            {
+                iter->memo = memoTemp;
+            }
+            ++iter;
+        }
+    }
     return pretties;
 } FC_CAPTURE_AND_RETHROW() }
 
@@ -1354,7 +1434,7 @@ void Wallet::remove_transaction_entry( const string& entry_id )
 PrettyTransaction Wallet::to_pretty_trx( const WalletTransactionEntry& trx_rec ) const
 {
    PrettyTransaction pretty_trx;
-
+   string op_memo;
    pretty_trx.is_virtual = trx_rec.is_virtual;
    pretty_trx.is_confirmed = trx_rec.is_confirmed;
    pretty_trx.is_market = trx_rec.is_market;
@@ -1473,8 +1553,27 @@ PrettyTransaction Wallet::to_pretty_trx( const WalletTransactionEntry& trx_rec )
            && entry.memo.find( "cover" ) == 0 )
            pretty_entry.from_account.replace(0, 5, "MARGIN" );
 
+
+       for (const auto & op : trx_rec.trx.operations)
+       {
+           switch (op.type)
+           {
+               case imessage_memo_op_type:
+               {
+                   auto message_op = op.as<ImessageMemoOperation>();
+                   op_memo = message_op.imessage;
+                   break;
+               }
+               default:
+                   break;
+           }
+       }
+
        pretty_entry.amount = entry.amount;
-       pretty_entry.memo = entry.memo;
+       if (op_memo.empty() || op_memo == "")
+            pretty_entry.memo = entry.memo;
+       else
+           pretty_entry.memo = op_memo;
 
        pretty_trx.ledger_entries.push_back( pretty_entry );
    }
@@ -1515,6 +1614,263 @@ PrettyTransaction Wallet::to_pretty_trx( const WalletTransactionEntry& trx_rec )
 
    return pretty_trx;
 }
+
+
+PrettyTransaction		Wallet::to_pretty_trx(const goopal::blockchain::TransactionEntry& trx_entry, const std::string addr_for_fee) const
+{
+
+	PrettyTransaction pretty_trx;
+	string op_memo;
+	std::string local_addr_for_fee = addr_for_fee;
+	if (local_addr_for_fee != "")
+	{
+		auto local_account_entry = my->_blockchain->get_account_by_address(addr_for_fee);
+		if (local_account_entry.valid())
+		{
+			local_addr_for_fee = local_account_entry->name;
+		}
+	}
+	std::string from_account_str;
+	auto total_fee = Asset(0, 0);
+
+	auto block_num = trx_entry.chain_location.block_num;
+	auto trx = trx_entry.trx;
+	auto block_healder = my->_blockchain->get_block_header(block_num);
+
+	pretty_trx.is_virtual = false;
+	pretty_trx.is_confirmed = true;
+	pretty_trx.is_market = false;
+	pretty_trx.is_market_cancel = false;
+	pretty_trx.trx_id = trx_entry.trx.id();
+	pretty_trx.block_num = block_num;
+
+    //create null account
+	auto pretty_entry = PrettyLedgerEntry();
+
+
+	//find transaction from by transaction entry
+	for (const auto & op : trx_entry.trx.operations)
+	{
+		switch (op.type)
+		{
+		case withdraw_op_type:
+		{
+			auto withdraw_op = op.as<WithdrawOperation>();
+			auto bal_entry = my->_blockchain->get_balance_entry(withdraw_op.balance_id);
+            if (bal_entry.valid())
+			{
+                pretty_entry.from_account = (string)(*(bal_entry->condition.owner()));
+
+				total_fee += Asset(withdraw_op.amount);
+
+				{
+					auto account_entry = my->_blockchain->get_account_by_address(pretty_entry.from_account);
+					if (account_entry.valid())
+					{
+						pretty_entry.from_account = account_entry->name;
+					}
+				}
+				from_account_str = pretty_entry.from_account;
+
+			}
+			break;
+		}
+		case withdraw_pay_op_type:
+		{
+			const auto withdraw_pay_op = op.as<WithdrawPayOperation>();
+			pretty_entry.from_account = "NETWORK";
+			pretty_entry.memo = "withdraw pay";
+			total_fee += Asset(withdraw_pay_op.amount);
+		}
+		default:
+			break;
+		}
+		
+	}
+
+	if (block_num <= 0)
+		pretty_entry.from_account = "GENESIS";
+
+	for (const auto& op : trx.operations)
+	{
+		switch (OperationTypeEnum(op.type))
+		{
+		case deposit_op_type:
+		{
+			auto deposit_op = op.as<DepositOperation>();
+
+			switch ((WithdrawConditionTypes)deposit_op.condition.type)
+			{
+			case withdraw_signature_type:
+			{
+				const auto deposit = deposit_op.condition.as<WithdrawWithSignature>();
+				pretty_entry.to_account = (string)deposit.owner;
+				auto account_entry = my->_blockchain->get_account_by_address(pretty_entry.to_account);
+				if (account_entry.valid())
+				{
+					pretty_entry.to_account = account_entry->name;
+				}
+				pretty_entry.amount = Asset(deposit_op.amount);
+				total_fee -= Asset(deposit_op.amount);
+				break;
+			}
+			case withdraw_escrow_type:
+			{
+				auto deposit_es_op = deposit_op.condition.as<withdraw_with_escrow>();
+				auto amount = Asset(deposit_op.amount, deposit_op.condition.asset_id);
+				pretty_entry.to_account = (string)deposit_es_op.receiver;
+				auto account_entry = my->_blockchain->get_account_by_address(pretty_entry.to_account);
+				if (account_entry.valid())
+				{
+					pretty_entry.to_account = account_entry->name;
+				}
+				pretty_entry.amount = amount;
+				total_fee -= amount;
+				break;
+			}
+			default:
+				break;
+			}
+		}
+		default:
+			break;
+
+		}
+	}
+
+
+
+	for (const auto& op : trx.operations)
+	{
+		switch (OperationTypeEnum(op.type))
+		{
+		case register_account_op_type:
+		{
+			auto register_op = op.as<RegisterAccountOperation>();
+
+			auto account_name_entry = my->_blockchain->get_account_entry(register_op.name);
+			if (!account_name_entry.valid())
+			{
+				break;
+			}
+			pretty_entry.to_account = register_op.name;
+			pretty_entry.amount = Asset(0); // Assume scan_withdraw came first
+			pretty_entry.memo = "register " + account_name_entry->name; // Can't tell if initially registered as a delegate
+			break;
+		}
+		case update_account_op_type:
+		{
+			auto update_op = op.as<UpdateAccountOperation>();
+			auto oaccount = my->_blockchain->get_account_entry(update_op.account_id);
+			if (!oaccount.valid())
+				break;
+			auto account_name_entry = my->_blockchain->get_account_entry(oaccount->name);
+			if (!account_name_entry.valid())
+			{
+				break;
+			}
+			pretty_entry.to_account = account_name_entry->name;
+			pretty_entry.amount = Asset(0); // Assume scan_withdraw came first
+			pretty_entry.memo = "update " + account_name_entry->name;
+			break;
+
+		}
+		case create_asset_op_type:
+		{
+			auto create_asset_op = op.as<CreateAssetOperation>();
+			auto oissuer = my->_blockchain->get_account_entry(create_asset_op.issuer_account_id);
+			pretty_entry.to_account = (string)oissuer->owner_address();
+			auto account_entry = my->_blockchain->get_account_by_address(pretty_entry.to_account);
+			if (account_entry.valid())
+			{
+				pretty_entry.to_account = account_entry->name;
+			}
+			pretty_entry.amount = Asset(0); // Assume scan_withdraw came first
+			pretty_entry.memo = "create " + create_asset_op.symbol + " (" + create_asset_op.name + ")";
+			break;
+		}
+		case update_asset_op_type:
+			// TODO
+			break;
+		case issue_asset_op_type:
+		{
+			auto	issue_asset_op = op.as<IssueAssetOperation>();
+			pretty_entry.amount = issue_asset_op.amount;
+			pretty_entry.memo = "issue " + my->_blockchain->to_pretty_asset(issue_asset_op.amount);
+			break;
+		}
+
+		default:
+			break;
+		}
+	}
+    for (const auto & op : trx.operations)
+    {
+        switch (op.type)
+        {
+        case imessage_memo_op_type:
+        {
+            auto message_op = op.as<ImessageMemoOperation>();
+            op_memo = message_op.imessage;
+            break;
+        }
+        default:
+            break;
+        }
+    }
+	if (!(op_memo.empty() || op_memo == ""))
+         pretty_entry.memo = op_memo;
+	
+	pretty_trx.ledger_entries.push_back(pretty_entry);
+
+
+	if (!pretty_trx.is_virtual && !pretty_trx.is_market)
+	{
+		uint16_t unknown_count = 0;
+		uint16_t from_name_count = 0;
+		string from_name;
+		for (const PrettyLedgerEntry& entry : pretty_trx.ledger_entries)
+		{
+			if (entry.from_account == "UNKNOWN")
+			{
+				++unknown_count;
+			}
+			else if (ChainInterface::is_valid_account_name(entry.from_account))
+			{
+				++from_name_count;
+				if (!from_name.empty() && entry.from_account != from_name)
+				{
+					from_name_count = 0;
+					break;
+				}
+				from_name = entry.from_account;
+			}
+		}
+
+		if (from_name_count > 0 && unknown_count > 0 && from_name_count + unknown_count == pretty_trx.ledger_entries.size())
+		{
+			for (PrettyLedgerEntry& entry : pretty_trx.ledger_entries)
+				entry.from_account = from_name;
+		}
+	}
+	if (addr_for_fee != "")
+	{
+		if (local_addr_for_fee == from_account_str || pretty_entry.from_account == "NETWORK")
+			pretty_trx.fee = total_fee;
+		else
+			pretty_trx.fee = Asset(0, 0);
+	}
+	else
+		pretty_trx.fee = total_fee;
+	pretty_trx.timestamp = block_healder.timestamp;
+	pretty_trx.expiration_timestamp = trx_entry.trx.expiration;
+
+	return pretty_trx;
+
+
+}
+
+
 
 WalletTransactionEntry Wallet::get_transaction( const string& transaction_id_prefix )const
 {

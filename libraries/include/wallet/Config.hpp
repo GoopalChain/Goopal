@@ -1,6 +1,6 @@
 #pragma once
 
-#define GOP_WALLET_VERSION                                  uint32_t( 109 )
+#define GOP_WALLET_VERSION                                  uint32_t( 112 )
 
 #define GOP_WALLET_MIN_PASSWORD_LENGTH                      8
 #define GOP_WALLET_MIN_BRAINKEY_LENGTH                      32
